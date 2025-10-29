@@ -16,14 +16,26 @@
 
 #include <stdlib.h>
 
+char * allocate(int blockSize);
 void setBit(char * fsm, int bitToSet);
 void clearBit(char * fsm, int bitToSet);
 int getBit(char * fsm, int bitToSet);
 
-int initFSM() {
-    char * fsm = malloc(2560); // (n*blocksize, 5*512, hard coded for now)
+int initFSM(int blockSize) {
+    char * fsm = allocate(blockSize);
 
-    
+    // Mark all blocks free;
+    memset(fsm, 0, (5 * blockSize));
+
+    // VCB will be block 0, FSM blocks 1-5 inclusive, so mark first 6 blocks used
+    for (int i = 0; i < 6; i++) {
+        setBit(fsm, i);
+    }
+
+    // write 5 blocks to disk starting from block 1
+    LBAwrite(fsm, 5, 1);
+
+    return 1;
 }
 
 void setBit(char * fsm, int bitToSet) {
@@ -52,4 +64,9 @@ int getBit(char * fsm, int bitToSet) {
     int mask = 1 << bitInByte;
 
     return (fsm[byteNum] & mask);
+}
+
+char * allocate(int blockSize) {
+    char * fsm = malloc(5 * blockSize);
+    return fsm;
 }
