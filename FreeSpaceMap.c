@@ -35,8 +35,8 @@ int initFSM(int blockSize) {
         setBit(i);
     }
 
-    // write 5 blocks to disk starting from block 1
-    LBAwrite(fsm, 5, 1);
+    // Commit changes to disk
+    fsmWrite();
 
     return 1;
 }
@@ -82,4 +82,12 @@ int allocate(int blockSize) {
         }
     }
     return -1; // No free blocks left
+}
+
+// Allows the caller to commit fsm changes (that are in memory) to disk
+void fsmWrite() {
+    if (fsm != NULL) {
+        // write 5 blocks to disk starting from block 1
+        LBAwrite(fsm, 5, 1);
+    }
 }
