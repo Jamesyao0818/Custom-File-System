@@ -20,9 +20,9 @@
 static char * fsm = NULL;
 
 int allocate(int blockSize);
-void setBit(int bitToSet);
-void clearBit(int bitToClear);
-int getBit(int bitToGet);
+static void setBit(int bitToSet);
+static void clearBit(int bitToClear);
+static int getBit(int bitToGet);
 
 int initFSM(int blockSize) {
     fsm = malloc(5 * blockSize);
@@ -42,7 +42,7 @@ int initFSM(int blockSize) {
 }
 
 // Sets the given bit to 1
-void setBit(int bitToSet) {
+static void setBit(int bitToSet) {
     int byteNum = bitToSet / 8;
     int bitInByte = bitToSet % 8;
 
@@ -52,7 +52,7 @@ void setBit(int bitToSet) {
 }
 
 // Sets the given bit to 0
-void clearBit(int bitToClear) {
+static void clearBit(int bitToClear) {
     int byteNum = bitToClear / 8;
     int bitInByte = bitToClear % 8;
 
@@ -63,7 +63,7 @@ void clearBit(int bitToClear) {
 }
 
 // Returns the value of the given bit
-int getBit(int bitToGet) {
+static int getBit(int bitToGet) {
     int byteNum = bitToGet / 8;
     int bitInByte = bitToGet % 8;
 
