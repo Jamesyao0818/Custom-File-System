@@ -16,20 +16,23 @@
 
 #include <stdlib.h>
 
-char * allocate(int blockSize);
-void setBit(char * fsm, int bitToSet);
-void clearBit(char * fsm, int bitToSet);
-int getBit(char * fsm, int bitToSet);
+// Global so it doesn't need to be read/write from disk every time
+static char * fsm = NULL;
+
+int allocate(int blockSize);
+void setBit(int bitToSet);
+void clearBit(int bitToClear);
+int getBit(int bitToGet);
 
 int initFSM(int blockSize) {
-    char * fsm = allocate(blockSize);
+    fsm = malloc(5 * blockSize);
 
     // Mark all blocks free;
     memset(fsm, 0, (5 * blockSize));
 
     // VCB will be block 0, FSM blocks 1-5 inclusive, so mark first 6 blocks used
     for (int i = 0; i < 6; i++) {
-        setBit(fsm, i);
+        setBit(i);
     }
 
     // write 5 blocks to disk starting from block 1
@@ -38,7 +41,8 @@ int initFSM(int blockSize) {
     return 1;
 }
 
-void setBit(char * fsm, int bitToSet) {
+// Sets the given bit to 1
+void setBit(int bitToSet) {
     int byteNum = bitToSet / 8;
     int bitInByte = bitToSet % 8;
 
@@ -47,9 +51,10 @@ void setBit(char * fsm, int bitToSet) {
     fsm[byteNum] = fsm[byteNum] | mask;
 }
 
-void clearBit(char * fsm, int bitToSet) {
-    int byteNum = bitToSet / 8;
-    int bitInByte = bitToSet % 8;
+// Sets the given bit to 0
+void clearBit(int bitToClear) {
+    int byteNum = bitToClear / 8;
+    int bitInByte = bitToClear % 8;
 
     int mask = 1 << bitInByte;
     mask = ~mask;
@@ -57,16 +62,24 @@ void clearBit(char * fsm, int bitToSet) {
     fsm[byteNum] = fsm[byteNum] & mask;
 }
 
-int getBit(char * fsm, int bitToSet) {
-    int byteNum = bitToSet / 8;
-    int bitInByte = bitToSet % 8;
+// Returns the value of the given bit
+int getBit(int bitToGet) {
+    int byteNum = bitToGet / 8;
+    int bitInByte = bitToGet % 8;
 
     int mask = 1 << bitInByte;
 
     return (fsm[byteNum] & mask);
 }
 
-char * allocate(int blockSize) {
-    char * fsm = malloc(5 * blockSize);
-    return fsm;
+// Returns the bit position of the next free block, and marks it as used
+int allocate(int blockSize) {
+    int totalBits = 5 * 8 * blockSize;
+    for (int i = 0; i < totalBits; i++) {
+        if(getBit(i) == 0) {
+            setBit(i);
+            return i;
+        }
+    }
+    return -1; // No free blocks left
 }
