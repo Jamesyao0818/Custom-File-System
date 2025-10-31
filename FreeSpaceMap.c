@@ -19,7 +19,7 @@
 // Global so it doesn't need to be read/write from disk every time
 static char * fsm = NULL;
 
-int allocate(int blockSize);
+int allocate(int n, int blockSize);
 static void setBit(int bitToSet);
 static void clearBit(int bitToClear);
 static int getBit(int bitToGet);
@@ -72,21 +72,37 @@ static int getBit(int bitToGet) {
     return (fsm[byteNum] & mask);
 }
 
-// Returns the bit position of the next free block, and marks it as used
-int allocate(int blockSize) {
+// Finds a grouping of n free blocks, returns starting block position
+int allocate(int n, int blockSize) {
     int totalBits = 5 * 8 * blockSize;
-    for (int i = 0; i < totalBits; i++) {
+    for(int i = 0; i < (totalBits - n); i++) {
+        // Check if current bit is free
         if(getBit(i) == 0) {
-            setBit(i);
-            return i;
+            // Check if the following requested bits are also free
+            int found = 1;
+            for(int j = 1; j < n; j++) {
+                if(getBit(i + j) == 1) {
+                    found = 0;
+                    // No need to recheck this section of blocks, skip
+                    i = i + j;
+                    break;
+                }
+            }
+            if(found) {
+                // Mark the allocated blocks as used
+                for(int j = 0; j < n; j++) {
+                    setBit(i + j);
+                }
+                return i;
+            }
         }
     }
-    return -1; // No free blocks left
+    return -1; // No free block group of requested size
 }
 
 // Allows the caller to commit fsm changes (that are in memory) to disk
 void fsmWrite() {
-    if (fsm != NULL) {
+    if(fsm != NULL) {
         // write 5 blocks to disk starting from block 1
         LBAwrite(fsm, 5, 1);
     }
