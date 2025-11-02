@@ -15,14 +15,12 @@
 **************************************************************/
 
 #include <stdlib.h>
+#include <FSM.h>
+#include <string.h>
+#include "fsLow.h"
 
 // Global so it doesn't need to be read/write from disk every time
-static char * fsm = NULL;
-
-int allocate(int n, int blockSize);
-static void setBit(int bitToSet);
-static void clearBit(int bitToClear);
-static int getBit(int bitToGet);
+static char *fsm = NULL;
 
 int initFSM(int blockSize) {
     fsm = malloc(5 * blockSize);
@@ -72,32 +70,17 @@ static int getBit(int bitToGet) {
     return (fsm[byteNum] & mask);
 }
 
-// Finds a grouping of n free blocks, returns starting block position
-int allocate(int n, int blockSize) {
+// Returns the bit position of the next free block, and marks it as used
+// Gets free block
+int allocate(int blockSize) {
     int totalBits = 5 * 8 * blockSize;
-    for(int i = 0; i < (totalBits - n); i++) {
-        // Check if current bit is free
+    for (int i = 0; i < totalBits; i++) {
         if(getBit(i) == 0) {
-            // Check if the following requested bits are also free
-            int found = 1;
-            for(int j = 1; j < n; j++) {
-                if(getBit(i + j) == 1) {
-                    found = 0;
-                    // No need to recheck this section of blocks, skip
-                    i = i + j;
-                    break;
-                }
-            }
-            if(found) {
-                // Mark the allocated blocks as used
-                for(int j = 0; j < n; j++) {
-                    setBit(i + j);
-                }
-                return i;
-            }
+            setBit(i);
+            return i;
         }
     }
-    return -1; // No free block group of requested size
+    return -1; // No free blocks left
 }
 
 // Allows the caller to commit fsm changes (that are in memory) to disk

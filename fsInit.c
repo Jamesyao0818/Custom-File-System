@@ -24,6 +24,8 @@
 #include "fsLow.h"
 #include "mfs.h"
 #include "VCB.h"
+#include "FSM.h"
+#include "DE.h"
 
 
 int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
@@ -75,7 +77,12 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			return -1;
 			}
 		}
-
+		if(initFSM(blockSize) != 1){
+			printf("Error: Failed to initialize FSM\n");
+		}
+		if (!createDir(2, NULL, blockSize)){
+			printf("Error: Failed to create directories.\n");
+		}
 	return 0;
 	}
 	
