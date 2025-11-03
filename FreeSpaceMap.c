@@ -15,9 +15,9 @@
 **************************************************************/
 
 #include <stdlib.h>
-#include <FSM.h>
 #include <string.h>
 #include "fsLow.h"
+#include "FSM.h"
 
 // Global so it doesn't need to be read/write from disk every time
 static char *fsm = NULL;
@@ -28,8 +28,8 @@ int initFSM(int blockSize) {
     // Mark all blocks free;
     memset(fsm, 0, (5 * blockSize));
 
-    // VCB will be block 0, FSM blocks 1-5 inclusive, so mark first 6 blocks used
-    for (int i = 0; i < 6; i++) {
+    // VCB will be block 1 (To account for block 0 being Professor Partition Table), FSM blocks 2-6 inclusive, so mark first 7 blocks used
+    for (int i = 0; i <= 6; i++) {
         setBit(i);
     }
 

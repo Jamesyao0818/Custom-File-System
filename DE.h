@@ -1,5 +1,7 @@
 #ifndef _DE_H
 #define _DE_H
+#include <time.h>
+
 //Directory Entry Struct
 typedef struct DE {
     // Starting head of the file's location (for discontiguous files)
@@ -24,7 +26,7 @@ typedef struct DE {
 } DE;
 
 //Function Declarations
-void writeDirToDisk(const DE * dir, int blockSize);
-DE* createDir(int minEntries, DE * parent, int blockSize);
+void writeDirToDisk(const DE *dir, int blockSize);
+DE* createDir(int minEntries, DE *parent, int blockSize);
 
 #endif

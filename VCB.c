@@ -1,7 +1,7 @@
 /**************************************************************
 * Class::  CSC-415-0# Spring 2024
-* Name::
-* Student IDs::
+* Name:: Enrique Cabral 
+* Student IDs:: 
 * GitHub-Name::
 * Group-Name::
 * Project:: Basic File System
