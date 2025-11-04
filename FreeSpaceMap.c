@@ -1,7 +1,7 @@
 /**************************************************************
 * Class::  CSC-415-01 Fall 2025
 * Name:: Ian Kligman
-* Student IDs:: 924122742, tbd, tbd, tbd
+* Student IDs:: 924122742
 * GitHub-Name:: ikligman
 * Group-Name:: Don't Worry We Don't Byte
 * Project:: Basic File System
@@ -28,7 +28,7 @@ int initFSM(int blockSize) {
     // Mark all blocks free;
     memset(fsm, 0, (5 * blockSize));
 
-    // VCB will be block 1 (To account for block 0 being Professor Partition Table), FSM blocks 2-6 inclusive, so mark first 7 blocks used
+    // VCB will be physical block 1 logical block 0 (To account for block 0 being Professor Partition Table), FSM blocks 2-6 inclusive, so mark first 7 blocks used
     for (int i = 0; i <= 6; i++) {
         setBit(i);
     }
@@ -89,4 +89,21 @@ void fsmWrite() {
         // write 5 blocks to disk starting from block 1
         LBAwrite(fsm, 5, 1);
     }
+}
+
+int loadFSM (int blockSize, unsigned int startBlock){
+    size_t numBytes = 5 * blockSize;
+    if (fsm) { 
+        free(fsm);
+        fsm = NULL;
+    }
+    fsm = (char*)malloc(numBytes);
+    if (!fsm) return -1;
+    uint64_t blocksRead = LBAread(fsm, 5, startBlock);
+    if (blocksRead != 5){
+        free(fsm);
+        fsm = NULL;
+        return -1;
+    }
+    return 0;
 }

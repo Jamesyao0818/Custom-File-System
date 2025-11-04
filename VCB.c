@@ -1,16 +1,16 @@
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
+* Class::  CSC-415-01 Spring 2024
 * Name:: Enrique Cabral 
-* Student IDs:: 
-* GitHub-Name::
-* Group-Name::
+* Student IDs:: 924056104
+* GitHub-Name:: rommix408
+* Group-Name:: Don't Worry We Don't Byte
 * Project:: Basic File System
 *
 * File:: VCB.c
 *
 * Description:: Volume Control Block implementation.
 *	Handles reading, writing, and initialization of the VCB
-*	which is stored at block 0 on disk.
+*	which is stored at block 1 on disk.
 *
 **************************************************************/
 
@@ -52,14 +52,15 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	vcb->numBlocks = (unsigned int)numberOfBlocks;
 	vcb->blockSize = (unsigned int)blockSize;
 	
-	// FSM (Free Space Map) starts at block 1 (blocks 1-5)
+	// Due to partition table being at physical block address 0, vcb is at lba 0, but really pba 1.
+	// Subsequently fsm is at lba 1 pba 2.
 	vcb->blockIndexFSM = 1;
 	
-	// Root directory will start after VCB (block 0) and FSM (blocks 1-5)
-	// So root directory starts at block 6
+	// Root directory will start after VCB (lba 0) and FSM (lba's 1-6)
+	// So root directory starts at lba 6.
 	vcb->blockIndexRootDirectory = 6;
 
-	// Write VCB to disk at block 0
+	// Write VCB to disk at block 1
 	uint64_t blocksWritten = LBAwrite(buffer, 1, 0);
 	if (blocksWritten != 1)
 		{
@@ -90,7 +91,7 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	return 0;
 	}
 
-// Read VCB from disk (block 0) into memory
+// Read VCB from disk (block 1) into memory
 int readVCB(uint64_t blockSize)
 	{
 	// Store block size for future operations
@@ -107,7 +108,7 @@ int readVCB(uint64_t blockSize)
 	// Zero out the buffer
 	memset(buffer, 0, blockSize);
 
-	// Read block 0 from disk
+	// Read block 1 from disk
 	uint64_t blocksRead = LBAread(buffer, 1, 0);
 	if (blocksRead != 1)
 		{
@@ -153,7 +154,7 @@ int readVCB(uint64_t blockSize)
 	return 0;
 	}
 
-// Write VCB from memory to disk (block 0)
+// Write VCB from memory to disk (block 1)
 int writeVCB(void)
 	{
 	if (vcbInMemory == NULL)
@@ -176,7 +177,7 @@ int writeVCB(void)
 	// Copy VCB to buffer
 	memcpy(buffer, vcbInMemory, sizeof(struct VCB));
 
-	// Write to disk at block 0
+	// Write to disk at block 1
 	uint64_t blocksWritten = LBAwrite(buffer, 1, 0);
 	if (blocksWritten != 1)
 		{

@@ -1,3 +1,18 @@
+/**************************************************************
+* Class::  CSC-415-01 Fall 2025
+* Name:: Joseph Bowen & James Yao
+* Student IDs:: 92296678
+* GitHub-Name:: josephb333 & Jamesyao0818
+* Group-Name:: Don't Worry We Don't Byte
+* Project:: Basic File System
+*
+* File:: DE.h
+*
+* Description:: This file contains struct layout for our 
+* directory entries, necessary inclusion of time.h for time_t variables,
+* and necessary function prototypes.
+*
+**************************************************************/
 #ifndef _DE_H
 #define _DE_H
 #include <time.h>

@@ -1,8 +1,8 @@
     /**************************************************************
     * Class::  CSC-415-01 Fall 2025
     * Name:: Joseph Bowen & James Yao
-    * Student IDs:: 92296678
-    * GitHub-Name:: josephb333
+    * Student IDs:: 92296678 & 923978442
+    * GitHub-Name:: josephb333 & Jamesyao0818
     * Group-Name:: Don't Worry We Don't Byte
     * Project:: Basic File System
     *
@@ -97,7 +97,8 @@
         //Remember to refactor this function LATER!!!!
         int blocksToWrite = (dir[0].numBytes + blockSize - 1) / blockSize; // Should just be one.
         int blockIndex = dir[0].blockNumber;
-        LBAwrite((char*)dir, 1, blockIndex);
+        //printf("Dir block number: %d\n", dir[0].blockNumber);
+        LBAwrite((char*)dir, 1, dir->blockNumber - 1);
         /*for (int i = 0; i < blocksToWrite; i++){
             //int blockIndex = getNthBlockOfChain(dir->loc,i);
             

@@ -1,9 +1,9 @@
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
-* Name::
-* Student IDs::
-* GitHub-Name::
-* Group-Name::
+* Class::  CSC-415-01 Spring 2024
+* Name:: Enrique Cabral 
+* Student IDs:: 924056104
+* GitHub-Name:: rommix408
+* Group-Name:: Don't Worry We Don't Byte
 * Project:: Basic File System
 *
 * File:: VCB.h
@@ -44,12 +44,12 @@ struct VCB
 // Returns 0 on success, -1 on error
 int initVCB(uint64_t numberOfBlocks, uint64_t blockSize);
 
-// Read VCB from disk (block 0) into memory
+// Read VCB from disk (block 1) into memory
 // blockSize is needed to allocate the correct buffer size
 // Returns 0 on success, -1 on error
 int readVCB(uint64_t blockSize);
 
-// Write VCB from memory to disk (block 0)
+// Write VCB from memory to disk (block 1)
 // Returns 0 on success, -1 on error
 int writeVCB(void);
 
