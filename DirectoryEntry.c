@@ -51,6 +51,7 @@
             dir[i].numBytes = 0;
             dir[i].blockNumber = -1;
             dir[i].loc = -1;
+            dir[i].numBlocks = 0;
         }
         
         time_t now = time(NULL);
@@ -67,6 +68,7 @@
         dir[0].accessDate = now;
         dir[0].loc = rootPhys;
         dir[0].blockNumber = rootPhys;
+        dir[0].numBlocks = 1;
         
         // Setup ".." entry (parent directory)
         if (!parent) {
@@ -85,6 +87,7 @@
         dir[1].accessDate = dir[0].accessDate;
         dir[1].blockNumber = parentPhys;
         dir[1].loc = parentPhys;
+        dir[1].numBlocks = 1;
         //4i)
         writeDirToDisk(dir, blockSize);
         //4j)

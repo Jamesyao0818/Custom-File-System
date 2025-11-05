@@ -38,6 +38,7 @@ typedef struct DE {
     
     // For discontiguous storage, we need to track the chain of blocks
     int loc;  // Starting location in block allocation structure
+    int numBlocks;  // Number of blocks allocated to this file/directory
 } DE;
 
 //Function Declarations
