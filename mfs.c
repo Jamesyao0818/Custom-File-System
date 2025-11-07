@@ -38,8 +38,19 @@ int fs_closedir(fdDir *dirp);
 
 // Joe 
 // Misc directory functions
-char * fs_getcwd(char *pathname, size_t size);
-int fs_setcwd(char *pathname);   //linux chdir
+char * fs_getcwd(char *pathname, size_t size){
+
+}
+
+//linux chdir
+int fs_setcwd(char *pathname){
+    if (!pathname || strlen(pathname) == 0) return 0;
+    parsePathInfo ppi;
+    if (parsePath(pathname, &ppi) != 0); 
+    printf("Error in fs_setcwd: Invalid path\n");
+    if (fs_isFile(ppi.lastElementName) == 0)
+    alreadyLoadedCWD = ppi.parent;
+}   
 
 // Returns 1 if file, 0 otherwise;
 int fs_isFile(char * filename){
@@ -65,40 +76,7 @@ int fs_isDir(char * pathname){
 int fs_delete(char* filename);	//removes a file
 
 // James
-int fs_stat(const char *path, struct fs_stat *buf){
-    // Input validation
-    if (path == NULL || buf == NULL) {
-        return -1; // Invalid input
-    }
-
-    // Parse the path to get the DE
-    parsePathInfo ppi;
-    int parseResult = parsePath((char *)path, &ppi);
-    if (parseResult != 0) {
-        return -2; // Path parsing error
-    }
-
-    DE *targetDE;
-    if (ppi.index >= 0) {
-        targetDE = &ppi.parent[ppi.index];
-    }else{
-        return -3; // File not found
-    }
-
-    // Fill in the fs_stat structure
-    buf->st_size = (off_t)targetDE->numBytes;
-    
-    struct VCB* vcb = getVCB();
-    buf->st_blksize = (blksize_t)vcb->blockSize;
-    
-    buf->st_blocks = (blkcnt_t)((targetDE->numBytes + 511) / 512); // Number of 512B blocks allocated
-
-    buf->st_accesstime = targetDE->accessDate;
-    buf->st_modtime = targetDE->modifyDate;
-    buf->st_createtime = targetDE->createDate;
-
-    return 0; // Success
-}
+int fs_stat(const char *path, struct fs_stat *buf);
 
 // Joe
 DE *loadDirectory(const DE *dirEntry){
