@@ -58,7 +58,6 @@ int fs_stat(const char *path, struct fs_stat *buf);
 // Helper functions;
 // Enrique
 int findInDir(DE *dir, const char *name);
-int isDEaDir();
 
 // Joe
 DE *loadDirectory(const DE *dirEntry){
@@ -155,9 +154,10 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
             return -2; // invalid path
         } 
 
-        if (!isDEaDir(&parent[idx])) {
+        if (!parent[idx].isDir) {
             return -3; // invalid path (can't be file in middle)
-        } 
+        }
+
         DE *tempParent = loadDirectory(&parent[idx]);
 
         if (tempParent == NULL) {
@@ -191,3 +191,7 @@ int findInDirectory(DE * directory, char * token) {
     // not found
     return -1;
 }
+
+// only neccisary if we change our DE structure...
+// if (!isDEaDir(&parent[idx])) {
+// int isDEaDir(DE * entry) {}
