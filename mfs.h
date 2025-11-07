@@ -75,10 +75,9 @@ int fs_setcwd(char *pathname);   //linux chdir
 // Joe
 int fs_isFile(char * filename);	//return 1 if file, 0 otherwise
 int fs_isDir(char * pathname);		//return 1 if directory, 0 otherwise
+
 // Enrique
 int fs_delete(char* filename);	//removes a file
-// char * targetPath = Home/Documents/Foo/Bar;
-// DE * alreadyLoadedRootDir;
 
 // Struct for int parsePath()
 typedef struct parsePathInfo {
@@ -88,9 +87,15 @@ typedef struct parsePathInfo {
 } parsePathInfo;
 
 // Helper functions;
-// int findInDir(); Enrique
-// int isDEaDir(); Enrique 
-// int parsePath(char * pathName, parsePathInfo *ppi) ; Ian
+// Enrique
+int findInDir(DE *dir, const char *name);
+int isDEaDir();
+
+// Joe
+DE *loadDirectory(const DE *dirEntry);
+
+// Ian
+int parsePath(char * pathName, parsePathInfo *ppi);
 
 // This is the strucutre that is filled in from a call to fs_stat
 struct fs_stat
