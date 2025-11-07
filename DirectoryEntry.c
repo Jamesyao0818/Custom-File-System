@@ -107,3 +107,100 @@
         }*/
         fsmWrite();
     }
+
+    void writeDirToDiskDiscontiguous(const DE *dir, int blockSize, void* blockList) {
+        if (!blockList || ll_isEmpty(blockList)) {
+            return;
+        }
+    
+        int numBlocks = ll_size(blockList);
+        int totalBytes = dir[0].numBytes;
+        int bytesWritten = 0;
+    
+        // Write each block from the chain
+        for (int i = 0; i < numBlocks; i++) {
+            int blockNum = getNthBlockOfChain(blockList, i);  // ← Gets actual block number
+            char *dataPtr = (char*)dir + (i * blockSize);
+            int bytesToWrite = (totalBytes - bytesWritten) < blockSize ? (totalBytes - bytesWritten) : blockSize;
+            LBAwrite(dataPtr, 1, blockNum);
+            bytesWritten += bytesToWrite;
+            if (bytesWritten >= totalBytes) {
+                break;
+            }
+        }
+    
+        fsmWrite();
+    }
+
+    DE* readDirFromDiskDiscontiguous(int startBlock, int numBlocks, int blockSize){
+        if (!blockList || ll_isEmpty(blockList)) {
+        return NULL;
+        }
+    
+        int numBlocks = ll_size(blockList);
+        int totalBytes = numBlocks * blockSize;
+        DE *dir = (DE *)malloc(totalBytes);
+        if (!dir) return NULL;
+    
+        // Read each block from the chain
+        for (int i = 0; i < numBlocks; i++) {
+            int blockNum = getNthBlockOfChain(blockList, i);  // ← Gets actual block number
+            char *dataPtr = (char*)dir + (i * blockSize);
+            LBAread(dataPtr, 1, blockNum);
+        }
+    
+        return dir;
+    }
+
+    DE* createDirDiscontiguous(int minEntries, DE *parent, int blockSize){
+        //4a) How much memory neeeded
+        //4b) Number of entries wanted is minEntries parameter.
+        //4c) Multiply size of your directory entry by number of entry to get number of bytes needed.
+        // Make sure we never have less then 2 directories.
+        if (minEntries < 2) { minEntries = 2;}
+        int bytesNeeded = minEntries * (int)sizeof(DE);
+        //4d) How many blocks needed.
+        int blocksNeeded = (bytesNeeded + (blockSize - 1)) / blockSize;
+        int bytesToMalloc = blocksNeeded * blockSize;
+        // How many entries could fit in that space
+        int actualEntriesCount = bytesToMalloc / (int)sizeof(DE);
+
+        DE * dir = (DE *)malloc(bytesToMalloc);
+        if (!dir) { return NULL;}
+        //Make clean slate.
+        memset(dir, 0, bytesToMalloc);
+        
+        //4e) Initiliaze entries
+        // Initialize all entries as empty
+        for (int i = 2; i < actualEntriesCount; i++) {
+            dir[i].name[0] = '\0';
+            dir[i].isDir = 0;
+            dir[i].numBytes = 0;
+            dir[i].blockNumber = -1;
+            dir[i].loc = -1;
+        }
+        
+        time_t now = time(NULL);
+        //4f) Allocate blocks (one block for root directory)
+        void* blockList = ll_create();
+        if (!blockList) { free(dir); return NULL;}
+        for (int i = 0; i < blocksNeeded; i++) {
+            int physBlock = allocate(blockSize);
+            if (physBlock < 0) {
+                ll_destroy(blockList);
+                free(dir);
+                return NULL;
+            }
+            ll_addLast(blockList, physBlock);
+        }
+
+        // Setup "." entry (current directory)
+        strcpy(dir[0].name, ".");
+        dir[0].numBytes = actualEntriesCount * (int)sizeof(DE);
+        dir[0].isDir = 1;
+        dir[0].createDate = now;
+        dir[0].modifyDate = now;
+        dir[0].accessDate = now;
+        dir[0].loc = getNthBlockOfChain(blockList, 0);
+        dir[0].blockNumber
+    }

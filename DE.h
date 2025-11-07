@@ -44,4 +44,12 @@ typedef struct DE {
 void writeDirToDisk(const DE *dir, int blockSize);
 DE* createDir(int minEntries, DE *parent, int blockSize);
 
+//New function prototypes for discontiguous directory handling
+//blocklist-> linked list or array of block numbers allocated to the directory
+void writeDirToDiskDiscontiguous(const DE *dir, int blockSize, void* blockList);
+//Read directory from disk given starting block and number of blocks
+DE* readDirFromDiskDiscontiguous(int startBlock, int numBlocks, int blockSize);
+//Create directory that can span multiple non-contiguous blocks
+DE* createDirDiscontiguous(int minEntries, DE *parent, int blockSize);
+
 #endif
