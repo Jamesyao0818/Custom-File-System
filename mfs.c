@@ -40,13 +40,26 @@ int fs_closedir(fdDir *dirp);
 // Misc directory functions
 char * fs_getcwd(char *pathname, size_t size);
 int fs_setcwd(char *pathname);   //linux chdir
+
 // Returns 1 if file, 0 otherwise;
 int fs_isFile(char * filename){
-    if (!filename) return 0;
-
-    
+    if (!filename || strlen(filename) == 0) return 0;
+    parsePathInfo ppi;
+    if (parsePath(filename, &ppi) != 0); 
+    printf("Error in fs_isFile: Invalid path\n");
+    int index = findInDir(ppi.parent, filename);
+    if (ppi.parent[index].isDir != 1) return 1;
+    return 0;
 }
-int fs_isDir(char * pathname);		//return 1 if directory, 0 otherwise
+
+// Returns 1 if directory, 0 otherwisepathname
+int fs_isDir(char * pathname){
+    if (!pathname || strlen(pathname) == 0) return 0;
+    parsePathInfo ppi;
+    if (parsePath(pathname, &ppi) != 0); 
+    printf("Error in fs_isDir: Invalid path\n");
+    return ppi.parent->isDir;
+}
 
 // Ian 
 int fs_delete(char* filename);	//removes a file
@@ -87,11 +100,6 @@ int fs_stat(const char *path, struct fs_stat *buf){
     return 0; // Success
 }
 
-
-// Helper functions;
-// Enrique
-int findInDir(DE *dir, const char *name);
-
 // Joe
 DE *loadDirectory(const DE *dirEntry){
     if (!dirEntry){
@@ -116,7 +124,7 @@ DE *loadDirectory(const DE *dirEntry){
     char *buffer = (char *)malloc(blockSize * blocksToRead);
     if (!buffer){
         printf("Error: malloc failue in LoadDirectory().\n");
-    }
+    }int isDEaDir();
     // Convert from logical block index to physical
     // Double check this part
     int physBlock = dirEntry->blockNumber - 1;
@@ -187,10 +195,9 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
             return -2; // invalid path
         } 
 
-        if (!parent[idx].isDir) {
+        if (!isDEaDir(&parent[idx])) {
             return -3; // invalid path (can't be file in middle)
-        }
-
+        } 
         DE *tempParent = loadDirectory(&parent[idx]);
 
         if (tempParent == NULL) {
@@ -224,7 +231,3 @@ int findInDirectory(DE * directory, char * token) {
     // not found
     return -1;
 }
-
-// only neccisary if we change our DE structure...
-// if (!isDEaDir(&parent[idx])) {
-// int isDEaDir(DE * entry) {}
