@@ -110,54 +110,84 @@ DE *loadDirectory(const DE *dirEntry){
 
 // Ian
 // Returns 0 for valid path, any non-zero number reflects a specific error.
-int parsePath(char *pathName, parsePathInfo *ppi)
-{ 
-    // ppi is a buffer we will write to
-    // Determining if this a relative or absolute path.
-    DE *startParent;
-    DE *parent;
-    char *saveptr;
-    char *token1;
-    char *token2;
-    if (pathName == NULL) return -1;
-    if (pathName[0] == '/')
-    { 
-        // absolute path
+int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
+    // is this a relative or absolute path?
+    DE * startParent;
+    DE * parent;
+    char * saveptr;
+    char * token1;
+    char * token2;
+
+    if (path == NULL)
+        return -1;
+    if (path[0] == '/') { // absolute path
         startParent = alreadyLoadedRootDir;
-    } else {
+    }
+    else {
         startParent = alreadyLoadedCWD;
     }
-    // If path is just '/' obviously we are just at the root.
     parent = startParent;
-    token1 = strtok_r(path, "/", &saveptr);
-    if (token1 == NULL)
-    {
-        if (parent == alreadyLoadedRootDir)
-        { 
-            // i.e. path[0]="/""
+
+    token1 = strtok_r(path, '/', &saveptr);
+    if (token1 == NULL) {
+        if (parent == alreadyLoadedRootDir) { // i.e. path[0]='/'
             ppi->parent = parent;
-            ppi->lastElementName = NULL;
+            ppi->lastElement = NULL;
             ppi->index = -2;
             return 0;
-    } else { return -1;}
+        }
+        else {
+            return -1;
+        }
     }
+
     while (1)
     {
-        int idx = FindInDirectory(parent, token1);
-        token2 = strtok_r(NULL, "/", &saveptr);
-        if (token2 == NULL)
-        { // we are done, token 1 is last element
-            ppi->parent = parent
+        int idx = findInDirectory(parent, token1);
+        token2 = strtok_r(NULL, '/', &saveptr);
+        if (token2 == NULL) { // we are done, token 1 is last element
+            ppi->parent = parent;
             ppi->lastElementName = token1; // may need to do a strdup here depending
             ppi->index = idx;
             return 0;
         }
-        if (idx == -1) return -2; // invalid path
-        if (!isDEaDir(&parent[idx])) return -3; // invalid path (can't be file in middle)
-        DE *tempParent = LoadDirectory(&parent[idx]);
-        if (tempParent == NULL) return -4;
-        if (parent != startParent) free(parent);
+        if (idx == -1) {
+            return -2; // invalid path
+        } 
+
+        if (!isDEaDir(&parent[idx])) {
+            return -3; // invalid path (can't be file in middle)
+        } 
+        DE *tempParent = loadDirectory(&parent[idx]);
+
+        if (tempParent == NULL) {
+            return -4; // failed to load dir
+        }
+
+        if (parent != startParent) {
+            free(parent);
+        }
         parent = tempParent;
         token1 = token2;
     }
+}
+
+int findInDirectory(DE * directory, char * token) {
+    // input validation
+    if (directory == NULL || token == NULL) {
+        return -1;
+    }
+
+    // calculate number of entries based on numBytes (which may change)
+    int numEntries = directory[0].numBytes / sizeof(DE);
+
+    // iterate through each used entry, if it matches that is the index!
+    for (int i = 0; i < numEntries; i++) {
+        if (!strcmp(directory[i].name, token)) {
+            return i;
+        }
+    }
+
+    // not found
+    return -1;
 }
