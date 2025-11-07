@@ -1,9 +1,9 @@
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
-* Name::
-* Student IDs::
-* GitHub-Name::
-* Group-Name::
+* Class::  CSC-415-01 Fall 2025
+* Name:: Ian Kligman, Joseph Bowen, Cheng-Chieh Yao, Enrique Cabral-Mixco
+* Student IDs:: 924122742, 922966782 , 923978442, 924056104
+* GitHub-Name:: ikligman, josephb333, Jamesyao0818, rommix408
+* Group-Name:: Don't Worry We Don't Byte.
 * Project:: Basic File System
 *
 * File:: mfs.h
@@ -23,6 +23,7 @@
 #include <time.h>
 
 #include "b_io.h"
+#include "DE.h"
 
 #include <dirent.h>
 #define FT_REGFILE	DT_REG
@@ -50,12 +51,12 @@ struct fs_diriteminfo
 // from a directory.  This structure helps you (the file system) keep track of
 // which directory entry you are currently processing so that everytime the caller
 // calls the function readdir, you give the next entry in the directory
-typedef struct
+typedef struct fdDir
 	{
 	/*****TO DO:  Fill in this structure with what your open/read directory needs  *****/
 	unsigned short  d_reclen;		/* length of this record */
 	unsigned short	dirEntryPosition;	/* which directory entry position, like file pos */
-	//DE *	directory;			/* Pointer to the loaded directory you want to iterate */
+	DE * directory;			/* Pointer to the loaded directory you want to iterate */
 	struct fs_diriteminfo * di;		/* Pointer to the structure you return from read */
 	} fdDir;
 
@@ -71,10 +72,25 @@ int fs_closedir(fdDir *dirp);
 // Misc directory functions
 char * fs_getcwd(char *pathname, size_t size);
 int fs_setcwd(char *pathname);   //linux chdir
+// Joe
 int fs_isFile(char * filename);	//return 1 if file, 0 otherwise
 int fs_isDir(char * pathname);		//return 1 if directory, 0 otherwise
+// Enrique
 int fs_delete(char* filename);	//removes a file
+// char * targetPath = Home/Documents/Foo/Bar;
+// DE * alreadyLoadedRootDir;
 
+// Struct for int parsePath()
+typedef struct parsePathInfo {
+	DE * parent;
+	char *lastElementName;
+	int index; // -1 indicates it does not exist.
+} parsePathInfo;
+
+// Helper functions;
+// int findInDir(); Enrique
+// int isDEaDir(); Enrique 
+// int parsePath(char * pathName, parsePathInfo *ppi) ; Ian
 
 // This is the strucutre that is filled in from a call to fs_stat
 struct fs_stat
@@ -88,6 +104,7 @@ struct fs_stat
 	
 	/* add additional attributes here for your file system */
 	};
+
 
 int fs_stat(const char *path, struct fs_stat *buf);
 
