@@ -14,7 +14,10 @@
 **************************************************************/
 
 #include "mfs.h"
+#include "VCB.h"
+
 #include <string.h>
+#include <stdio.h>
 
 //Globals for access between functions.
 DE *alreadyLoadedRootDir = NULL;
@@ -37,7 +40,12 @@ int fs_closedir(fdDir *dirp);
 // Misc directory functions
 char * fs_getcwd(char *pathname, size_t size);
 int fs_setcwd(char *pathname);   //linux chdir
-int fs_isFile(char * filename);	//return 1 if file, 0 otherwise
+// Returns 1 if file, 0 otherwise;
+int fs_isFile(char * filename){
+    if (!filename) return 0;
+
+    
+}
 int fs_isDir(char * pathname);		//return 1 if directory, 0 otherwise
 
 // Ian 
@@ -54,7 +62,50 @@ int isDEaDir();
 
 // Joe
 DE *loadDirectory(const DE *dirEntry){
-
+    if (!dirEntry){
+        printf("Error: LoadDirectory called a NULL DE.\n");
+        return NULL;
+    }
+    if (dirEntry->isDir != 1){
+        printf("Error: LoadDirectory called on DE that is not a directory.\n")
+    }
+    // Use VCB to get block size.
+    struct VCB* v = getVCB();
+    int blockSize = v->blockSize;
+    // Calculate how many blocks we need to read for this directory.
+    int bytesToRead = (int)dirEntry->numBytes;
+    int blocksToRead = (bytesToRead + (blockSize - 1)) / blockSize;
+    int bytesToMalloc = blocksToRead * blockSize;
+    if (bytesToRead <= 0){
+        printf("Error: Invalid numBytes (%d) in DE\n", bytesToRead);
+        return NULL;
+    }
+    // Allocate memory for directory contents
+    char *buffer = (char *)malloc(blockSize * blocksToRead);
+    if (!buffer){
+        printf("Error: malloc failue in LoadDirectory().\n");
+    }
+    // Convert from logical block index to physical
+    // Double check this part
+    int physBlock = dirEntry->blockNumber - 1;
+    // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
+    u_int64_t blocksRead = LBAread(buffer, blocksToRead, physBlock);
+    if (blocksRead != (u_int64_t)blocksToRead) {
+        printf("Error: LoadDirectory failed to read: %d blocks (needed to read: %lu blocks).\n");
+        free (buffer)
+        return NULL;
+    }
+    // If read was done correctly, now we can just return the raw bytes of
+    // the dirEntry we want to load. Should work.
+    return (DE *)buffer;
+    // IN CASE THIS DOES NOT WORK TRY THIS.
+    /*
+    int numEntries = bytesToRead / sizeof(DE);
+    DE *dirArray = malloc(numEntries * sizeof(DE));
+    memcpy(dirArray, buffer, numEntries * sizeof(DE));
+    free(buffer);
+    return dirArray;
+    */
 }
 
 // Ian
