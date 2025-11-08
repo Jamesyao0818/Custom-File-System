@@ -20,7 +20,8 @@
     #include "fsLow.h"
     #include "FSM.h"
     #include "DE.h"
-
+    #include "LinkedList.h"
+    
     DE* createDir(int minEntries, DE * parent, int blockSize) {
         //4a) How much memory neeeded
         //4b) Number of entries wanted is minEntries parameter.

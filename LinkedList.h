@@ -37,4 +37,6 @@ int ll_freeBlocks(LinkedList* list);
 
 LinkedList* ll_createWithAllocation(int numBlocks, int blockSize);
 
+void ll_addLast(void* list, int value);
+
 #endif
