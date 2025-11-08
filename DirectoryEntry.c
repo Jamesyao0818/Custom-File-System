@@ -114,37 +114,37 @@
         }
     
         int numBlocks = ll_size(blockList);
-        int totalBytes = dir[0].numBytes;
-        int bytesWritten = 0;
+        int totalBytes = numBlocks * blockSize;
+        int blocksToWrite = (dir[0].numBytes + blockSize - 1) / blockSize;
+        if (blocksToWrite > numBlocks) {
+            // Not enough blocks allocated
+            return;
+        }
     
         // Write each block from the chain
-        for (int i = 0; i < numBlocks; i++) {
+        for (int i = 0; i < blocksToWrite; i++) {
             int blockNum = getNthBlockOfChain(blockList, i);  // ← Gets actual block number
             char *dataPtr = (char*)dir + (i * blockSize);
-            int bytesToWrite = (totalBytes - bytesWritten) < blockSize ? (totalBytes - bytesWritten) : blockSize;
             LBAwrite(dataPtr, 1, blockNum);
-            bytesWritten += bytesToWrite;
-            if (bytesWritten >= totalBytes) {
-                break;
-            }
         }
     
         fsmWrite();
     }
 
     DE* readDirFromDiskDiscontiguous(int startBlock, int numBlocks, int blockSize){
-        if (!blockList || ll_isEmpty(blockList)) {
-        return NULL;
+        if (numBlocks <= 0) {
+            return NULL;
         }
     
-        int numBlocks = ll_size(blockList);
-        int totalBytes = numBlocks * blockSize;
-        DE *dir = (DE *)malloc(totalBytes);
-        if (!dir) return NULL;
+        int bytesToRead = numBlocks * blockSize;
+        DE *dir = (DE *)malloc(bytesToRead);
+        if (!dir) {
+            return NULL;
+        }
     
         // Read each block from the chain
         for (int i = 0; i < numBlocks; i++) {
-            int blockNum = getNthBlockOfChain(blockList, i);  // ← Gets actual block number
+            int blockNum = startBlock + i;  // Assuming contiguous for simplicity
             char *dataPtr = (char*)dir + (i * blockSize);
             LBAread(dataPtr, 1, blockNum);
         }
@@ -202,5 +202,24 @@
         dir[0].modifyDate = now;
         dir[0].accessDate = now;
         dir[0].loc = getNthBlockOfChain(blockList, 0);
-        dir[0].blockNumber
+        dir[0].blockNumber = getNthBlockOfChain(blockList, 0);
+        // Setup ".." entry (parent directory)
+        if (!parent) {
+            // Root directory - parent points to itself
+            parent = dir;
+        }
+        int parentPhys = parent->blockNumber;
+        strcpy(dir[1].name, "..");
+        dir[1].numBytes = parent->numBytes;
+        dir[1].isDir = 1;
+        dir[1].createDate = dir[0].createDate;
+        dir[1].modifyDate = dir[0].modifyDate;
+        dir[1].accessDate = dir[0].accessDate;
+        dir[1].blockNumber = parentPhys;
+        dir[1].loc = parentPhys;
+        //4i)
+        writeDirToDiskDiscontiguous(dir, blockSize, blockList);
+        ll_destroy(blockList);
+        //4j)
+        return dir;
     }
