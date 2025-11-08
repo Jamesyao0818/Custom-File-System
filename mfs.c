@@ -285,3 +285,65 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
         token1 = token2;
     }
 }
+
+int fs_mkdir(const char *pathname, mode_t mode) {
+    // working copy of string
+    char * pathCopy = strdup(pathname);
+
+    // get ppi
+    parsePathInfo ppi;
+    if (parsePath(pathCopy, &ppi) != 0) {
+        return -1;
+    }
+
+    // get vcb for blockSize
+    struct VCB * vcb = getVCB();
+    
+    DE * newDir = createDir(2, ppi.parent, vcb->blockSize);
+
+    // update the new dir's . entry
+    strcpy(newDir[0].name, ppi.lastElementName);
+
+    // find a free index to put this entry in the parent
+    int freeIndex = -1;
+    int numEntries = ppi.parent[0].numBytes / sizeof(DE);
+    for (int i = 2; i < numEntries; i++) {
+        if (ppi.parent[i].name[0] == '\0') {
+            freeIndex = i;
+            break;
+        }
+    }
+
+    if (freeIndex == -1) {
+        return -2; // parent has no more room for entries
+    }
+
+    time_t now = time(NULL);
+
+    // add entry to parent's free directory entry index
+    strcpy(ppi.parent[freeIndex].name, ppi.lastElementName);
+    // update the parent's directory entry of this new dir
+    ppi.parent[freeIndex].isDir = 1;
+    ppi.parent[freeIndex].numBytes = newDir[0].numBytes;
+    ppi.parent[freeIndex].blockNumber = newDir[0].blockNumber;
+    ppi.parent[freeIndex].loc = newDir[0].loc;
+    ppi.parent[freeIndex].createDate = now;
+    ppi.parent[freeIndex].accessDate = now;
+    ppi.parent[freeIndex].modifyDate = now;
+
+    // this modified the parent, so update its mod time
+    ppi.parent[0].modifyDate = now;
+
+    // commit changes to disk
+    writeDirToDisk(ppi.parent, vcb->blockSize);
+    writeDirToDisk(newDir, vcb->blockSize);
+    
+    free(newDir);
+    free(pathCopy);
+
+    if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+        free(ppi.parent);
+    }
+
+    return 0;
+}
