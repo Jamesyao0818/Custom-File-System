@@ -275,7 +275,46 @@ struct fs_diriteminfo *fs_readdir(fdDir *dirp){
     return NULL;
 }
 
-int fs_closedir(fdDir *dirp);
+// Closes a directory and frees all resources associated with it. 
+// Every opendir should have a matching closedir. However, we are 
+// careful not to free cached directories (root and CWD)
+// since they're shared and may still be in use.
+int fs_closedir(fdDir *dirp){
+    // Input validation: can't close something that doesn't exist
+    if (dirp == NULL) {
+        return -1;
+    }
+    
+    // Check if this directory is one of our cached directories. Cached
+    // directories root and current working directory are kept in memory
+    // for performance and may be used by multiple operations. We should
+    // never free them here because other parts of the code might still
+    // be using them.
+    int isCached = 0;
+    if (dirp->directory == alreadyLoadedRootDir || 
+        dirp->directory == alreadyLoadedCWD) {
+        isCached = 1;
+    }
+    
+    // Only free the directory data if its not cached. If its cached,
+    // we leave it in memory.
+    if (!isCached && dirp->directory != NULL) {
+        free(dirp->directory);
+    }
+    
+    // Free the directory item info structure if it was allocated during
+    // readdir operations. This structure holds information about individual
+    // entries that we return to the caller.
+    if (dirp->di != NULL) {
+        free(dirp->di);
+    }
+    
+    // Free the directory descriptor structure itself. This was
+    // allocated in opendir and tracks our iteration state.
+    free(dirp);
+    
+    return 0; 
+}
 
 // Joe 
 // Misc directory functions
