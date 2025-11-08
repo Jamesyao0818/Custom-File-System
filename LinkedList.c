@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "LinkedList.h"
+#include "FSM.h"
+
+//helpers from FSM.h
+//extern int allocate(int blockSize);        // setbit in FSM
+//extern void releaseBlock(int blocknum);    // clearbit in FSM
+//extern void fsmWrite();
 
 /*create an empty linked list*/
 LinkedList* ll_create(){
@@ -14,7 +20,8 @@ LinkedList* ll_create(){
     return list;
 }
 
-LinkedList* ll_append(LinkedList* list, int blocknum){
+//return type should be int, not LinkedList*
+int ll_append(LinkedList* list, int blocknum){
     if(!list){
         return -1;
     }
@@ -52,9 +59,6 @@ int ll_get(LinkedList* list, int index){
     return curr->blocknum;
 }
 
-int getNthBlockOfChain(LinkedList* list, int n){
-    return ll_get(list, n);
-}
 
 int ll_removeFirst(LinkedList* list){
     if (!list || list->head == NULL) {
@@ -84,11 +88,20 @@ int ll_size(LinkedList* list){
     return list->size;
 }
 
+//ll_destroy should free all nodes and the list itself
 void ll_destroy(LinkedList* list){
     if (!list) {
-        return 1;
+        return;
     }
-    return (list->size == 0);
+    
+    LLNode* curr = list->head;
+    while (curr != NULL) {
+        LLNode* temp = curr;
+        curr = curr->next;
+        free(temp);
+    }
+    
+    free(list);
 }
 
 void ll_print(LinkedList* list){
@@ -115,20 +128,14 @@ void ll_print(LinkedList* list){
     printf("\n");
 }
 
+// ll_isEmpty should return whether the list is empty
 int ll_isEmpty(LinkedList* list){
     if (!list) {
-        return;
+        return 1;  // NULL list is considered empty
     }
-    
-    LLNode* curr = list->head;
-    while (curr != NULL) {
-        LLNode* temp = curr;
-        curr = curr->next;
-        free(temp);
-    }
-    
-    free(list);
+    return (list->size == 0);
 }
+
 
 int ll_allocateBlocks(LinkedList* list, int numBlocks, int blockSize) {
     if (!list || numBlocks <= 0) {
@@ -149,11 +156,11 @@ int ll_allocateBlocks(LinkedList* list, int numBlocks, int blockSize) {
         
         // Add the block to our linked list
         if (ll_append(list, blocknum) != 0) {
-            // Failed to append - free this block and rollback
-            freeBlock(blocknum);
+            releaseBlock(blocknum);
             ll_freeBlocks(list);
             return -1;
         }
+
     }
     
     // Commit FSM changes to disk
@@ -171,7 +178,7 @@ int ll_freeBlocks(LinkedList* list) {
     LLNode* curr = list->head;
     
     while (curr != NULL) {
-        freeBlock(curr->blocknum);
+        releaseBlock(curr->blocknum);
         freedCount++;
         curr = curr->next;
     }
@@ -202,4 +209,12 @@ LinkedList* ll_createWithAllocation(int numBlocks, int blockSize) {
     }
     
     return list;
+}
+
+void ll_addLast(LinkedList* list, int value) {
+    ll_append(list, value);
+}
+
+int getNthBlockOfChain(LinkedList* list, int n) {
+    return ll_get(list, n);
 }

@@ -23,5 +23,7 @@ int initFSM(int blockSize);
 static void setBit(int bitToSet);
 static void clearBit(int bitToClear);
 static int getBit(int bitToGet);
+void releaseBlock(int blocknum);
+void markBlockUsed(int blocknum);
 int loadFSM (int blockSize, unsigned int startBlock);
 #endif

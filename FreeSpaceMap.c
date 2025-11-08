@@ -14,7 +14,7 @@
 *
 **************************************************************/
 
-#include <stdlib.h>
+#include <stdlib.h>#include <stdlib.h>
 #include <string.h>
 #include "fsLow.h"
 #include "FSM.h"
@@ -106,4 +106,12 @@ int loadFSM (int blockSize, unsigned int startBlock){
         return -1;
     }
     return 0;
+}
+
+// keep Ian's work for sure and create releaseBlock and allocate functions
+// Frees the given block number
+void releaseBlock(int blocknum) {
+    if (blocknum < 0) return;
+    clearBit(blocknum);
+    fsmWrite();
 }
