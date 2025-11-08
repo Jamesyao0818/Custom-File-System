@@ -15,15 +15,36 @@
 
 #include "mfs.h"
 #include "VCB.h"
+#include "fsLow.h"
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 //Globals for access between functions.
 DE *alreadyLoadedRootDir = NULL;
 DE *alreadyLoadedCWD = NULL;
 
 //IMPLEMENT THESE FUNCTIONS
+int findInDirectory(DE * directory, char * token) {
+    // input validation
+    if (directory == NULL || token == NULL) {
+        return -1;
+    }
+
+    // calculate number of entries based on numBytes (which may change)
+    int numEntries = directory[0].numBytes / sizeof(DE);
+
+    // iterate through each used entry, if it matches that is the index!
+    for (int i = 0; i < numEntries; i++) {
+        if (!strcmp(directory[i].name, token)) {
+            return i;
+        }
+    }
+
+    // not found
+    return -1;
+}
 
 // Key directory functions
 // Ian
@@ -39,7 +60,56 @@ int fs_closedir(fdDir *dirp);
 // Joe 
 // Misc directory functions
 char * fs_getcwd(char *pathname, size_t size){
+    /*// /Home/Documents/HW/csc..filesystem/
+    if (!pathname || size == 0)
+        return NULL;
+    if (!alreadyLoadedCWD || !alreadyLoadedRootDir)
+        return NULL;
+    if (alreadyLoadedCWD[0].blockNumber == alreadyLoadedRootDir[0]){
+        if (size < 2) return NULL;
+        pathname[0] = '/';
+        pathname[1] = '/0';
+        return pathname;
+    }
+    // csc-filesystem...
+    // Home/..
+    // ^ length of this
+    // add to start buffer becasue just a pointer
+    // move lenght into that 
+    // /Documents
+    // ./../foo/bar/bla/.. 
+    // Home/bar
+    char *buf = malloc(size);
+    memset(buf, 0, size);
+    DE * currentDir = alreadyLoadedCWD; 
+    strcat(buf, alreadyLoadedCWD->name);
+    // csc-filesystem
+    strcat(buf, "/");
+    // csc-filesystem/
+    while (currentDir[1].name != alreadyLoadedRootDir->name){
+        strcat(buf, currentDir[1].name);
+        // csc-filesystem/HW
+        strcat(buf, "/");
+        // csc-filesystem/HW/
+        currentDir = currentDir[1];
+        strcat(buf, currentDir[1].name);
+        // csc-filesystem/HW/Documents
+        strcat(buf, "/");
+        // csc-filesystem/HW/Documents/
+    }
+    char ** arrayOfSubStrings = malloc(size * 8);
+    int index = 0;
+    if (arrayOfSubStrings[i] != "." || arrayOfSubStrings[i] != ".." ) index++;
+    char * token = strtok(buf, "/");
+    // "/" "csc-filesystem" "/" .....
+    while (!token){
+        arrayOfSubStrings[index] = token;
+    }
 
+    // buffer cscfilesystem/HW/Documents/Home/
+    // buffer cscfilesystem*HW*Documents*Home*/
+    //return buf;
+    return NULL; 
 }
 
 //linux chdir
@@ -48,7 +118,7 @@ int fs_setcwd(char *pathname){
     parsePathInfo ppi;
     if (parsePath(pathname, &ppi) != 0); 
     printf("Error in fs_setcwd: Invalid path\n");
-    if (fs_isFile(ppi.lastElementName) == 0)
+    if (fs_isFile(ppi.parent->name) == 0)
     alreadyLoadedCWD = ppi.parent;
 }   
 
@@ -111,7 +181,7 @@ DE *loadDirectory(const DE *dirEntry){
         return NULL;
     }
     if (dirEntry->isDir != 1){
-        printf("Error: LoadDirectory called on DE that is not a directory.\n")
+        printf("Error: LoadDirectory called on DE that is not a directory.\n");
     }
     // Use VCB to get block size.
     struct VCB* v = getVCB();
@@ -135,8 +205,8 @@ DE *loadDirectory(const DE *dirEntry){
     // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
     u_int64_t blocksRead = LBAread(buffer, blocksToRead, physBlock);
     if (blocksRead != (u_int64_t)blocksToRead) {
-        printf("Error: LoadDirectory failed to read: %d blocks (needed to read: %lu blocks).\n");
-        free (buffer)
+        printf("Error: LoadDirectory failed to read: %d blocks (needed to read: %lu blocks).\n", blocksToRead, blocksRead);
+        free (buffer);
         return NULL;
     }
     // If read was done correctly, now we can just return the raw bytes of
@@ -162,9 +232,9 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
     char * token1;
     char * token2;
 
-    if (path == NULL)
+    if (pathName == NULL)
         return -1;
-    if (path[0] == '/') { // absolute path
+    if (pathName[0] == '/') { // absolute path
         startParent = alreadyLoadedRootDir;
     }
     else {
@@ -172,11 +242,11 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
     }
     parent = startParent;
 
-    token1 = strtok_r(path, '/', &saveptr);
+    token1 = strtok_r(pathName, "/", &saveptr);
     if (token1 == NULL) {
         if (parent == alreadyLoadedRootDir) { // i.e. path[0]='/'
             ppi->parent = parent;
-            ppi->lastElement = NULL;
+            ppi->lastElementName = NULL;
             ppi->index = -2;
             return 0;
         }
@@ -188,7 +258,7 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
     while (1)
     {
         int idx = findInDirectory(parent, token1);
-        token2 = strtok_r(NULL, '/', &saveptr);
+        token2 = strtok_r(NULL, "/", &saveptr);
         if (token2 == NULL) { // we are done, token 1 is last element
             ppi->parent = parent;
             ppi->lastElementName = token1; // may need to do a strdup here depending
@@ -214,24 +284,4 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
         parent = tempParent;
         token1 = token2;
     }
-}
-
-int findInDirectory(DE * directory, char * token) {
-    // input validation
-    if (directory == NULL || token == NULL) {
-        return -1;
-    }
-
-    // calculate number of entries based on numBytes (which may change)
-    int numEntries = directory[0].numBytes / sizeof(DE);
-
-    // iterate through each used entry, if it matches that is the index!
-    for (int i = 0; i < numEntries; i++) {
-        if (!strcmp(directory[i].name, token)) {
-            return i;
-        }
-    }
-
-    // not found
-    return -1;
 }
