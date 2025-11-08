@@ -53,8 +53,228 @@ int fs_rmdir(const char *pathname);
 
 // Enrique
 // Directory iteration functions
-fdDir * fs_opendir(const char *pathname);
-struct fs_diriteminfo *fs_readdir(fdDir *dirp);
+// Opens a directory for reading its contents. This function prepares the
+// directory for iteration by loading it into memory or using a cached
+// version and creating a directory descriptor fdDirthat tracks our
+// position as we read through entries.
+fdDir * fs_opendir(const char *pathname){
+    // We need to check for NULL before calling strlen, which would crash
+    // if pathname is NULL. parsePath also checks for NULL, but we need
+    // to validate here first since we use strlen before calling parsePath.
+    if (pathname == NULL) {
+        return NULL;
+    }
+    
+    // parsePath uses strtok_r which modifies the input string, so we need
+    // to create a modifiable copy. This prevents corrupting the original
+    // pathname that the caller provided.
+    char *pathCopy = (char *)malloc(strlen(pathname) + 1);
+    if (pathCopy == NULL) {
+        return NULL;
+    }
+    strcpy(pathCopy, pathname);
+    
+    // Parse the pathname to break it down into components and find the
+    // target directory entry. The parsePathInfo structure will contain
+    // information about where the directory is located.
+    parsePathInfo ppi;
+    int parseResult = parsePath(pathCopy, &ppi);
+    free(pathCopy); // Clean up our temporary copy
+    if (parseResult != 0) {
+        return NULL; // Path doesn't exist or is invalid
+    }
+    
+    DE *targetDir = NULL;
+    int isCached = 0; // Track whether we're using a cached directory
+    
+    // When index is -2, it means we're opening the parent directory itself
+    // like opening "/" for root. This is how parsePath indicates that
+    // the path refers to a directory rather than something inside it.
+    if (ppi.index == -2) {
+        // Check if the parent directory is already loaded in memory
+        if (ppi.parent != NULL) {
+            // Use the already-loaded directory either cached or loaded
+            // by parsePath during path traversal
+            targetDir = ppi.parent;
+            // Mark as cached if it matches our global cache pointers
+            if (targetDir == alreadyLoadedRootDir || 
+                targetDir == alreadyLoadedCWD) {
+                isCached = 1;
+            }
+        } else {
+            // Root directory hasn't been loaded yet, so we need to read
+            // it from disk. We get the block location from the VCB
+            // (Volume Control Block) which stores filesystem metadata.
+            struct VCB* vcb = getVCB();
+            if (vcb == NULL) {
+                return NULL;
+            }
+            
+            // Read the root directory block from disk using LBAread
+            // (Logical Block Address read). The root directory is stored
+            // at a specific block location defined in the VCB.
+            int blockSize = vcb->blockSize;
+            int rootBlock = vcb->blockIndexRootDirectory;
+            char *buffer = (char *)malloc(blockSize);
+            if (buffer == NULL) {
+                return NULL;
+            }
+            
+            u_int64_t blocksRead = LBAread(buffer, 1, rootBlock);
+            if (blocksRead != 1) {
+                free(buffer);
+                return NULL;
+            }
+            
+            // Cast the buffer to a directory entry array and cache it
+            // for future use (so we don't have to read from disk again)
+            targetDir = (DE *)buffer;
+            alreadyLoadedRootDir = targetDir;
+            isCached = 1;
+        }
+    } else if (ppi.index >= 0) {
+        // A valid index means we found a directory entry inside a parent
+        // directory. We need to get a pointer to that entry.
+        DE *dirEntry = &ppi.parent[ppi.index];
+        
+        // Safety check: make sure this entry is actually a directory and
+        // not a regular file. You can't iterate through a file!
+        if (dirEntry->isDir != 1) {
+            return NULL;
+        }
+        
+        // Before loading from disk, check if this directory is already
+        // cached as the current working directory. We compare block
+        // numbers because that's how we uniquely identify directories.
+        if (alreadyLoadedCWD != NULL && 
+            dirEntry->blockNumber == alreadyLoadedCWD->blockNumber) {
+            targetDir = alreadyLoadedCWD;
+            isCached = 1;
+        } else {
+            // Not cached, so load the directory from disk. This reads the
+            // directory's data blocks and returns a pointer to the array
+            // of directory entries.
+            targetDir = loadDirectory(dirEntry);
+            if (targetDir == NULL) {
+                return NULL;
+            }
+        }
+    } else {
+        // Index is -1 meaning the directory wasn't found in the parent
+        return NULL;
+    }
+    
+    // Final validation: ensure we have a valid directory pointer and that
+    // it's actually marked as a directory not corrupted data
+    if (targetDir == NULL || targetDir->isDir != 1) {
+        return NULL;
+    }
+    
+    // Calculate how many directory entries can fit in this directory.
+    // The first entry index 0 stores the total size in numBytes, so
+    // we divide by the size of one directory entry to get the count.
+    int totalEntries = targetDir[0].numBytes / sizeof(DE);
+    if (totalEntries <= 0) {
+        return NULL; // Invalid directory size
+    }
+    
+    // Allocate memory for the directory descriptor structure. This is
+    // like a file descriptor but for directories it keeps track of
+    // which entry we're currently looking at.
+    fdDir *dirp = (fdDir *)malloc(sizeof(fdDir));
+    if (dirp == NULL) {
+        // If allocation fails clean up the directory we loaded but only
+        // if it's not cached since we shouldn't free cached directories
+        if (!isCached && targetDir != alreadyLoadedRootDir && 
+            targetDir != alreadyLoadedCWD) {
+            free(targetDir);
+        }
+        return NULL;
+    }
+    
+    // Initialize the directory descriptor. We start at position 0 the
+    // first entry, point to our loaded directory, and set the record
+    // length. The di pointer will be allocated when we first read an
+    // entry (lazy allocation to save memory if the directory is never
+    // actually read).
+    dirp->dirEntryPosition = 0;
+    dirp->directory = targetDir;
+    dirp->d_reclen = sizeof(DE);
+    dirp->totalEntries = totalEntries; // Store for efficiency in readdir
+    dirp->di = NULL;
+    
+    return dirp;
+}
+
+// Returns the next directory entry each time it's called. When there
+// are no more entries it returns NULL to signal the end.
+struct fs_diriteminfo *fs_readdir(fdDir *dirp){
+    // Input validation: need a valid directory descriptor and directory
+    if (dirp == NULL || dirp->directory == NULL) {
+        return NULL;
+    }
+    
+    // Use the totalEntries we calculated and stored in opendir. This
+    // avoids recalculating it every time readdir is called, which is
+    // more efficient
+    
+    // Loop through entries starting from our current position. We keep
+    // going until we've checked all possible entry slots
+    while (dirp->dirEntryPosition < dirp->totalEntries) {
+        // Get a pointer to the current directory entry we are examining
+        DE *currentEntry = &dirp->directory[dirp->dirEntryPosition];
+        
+        // Skip empty entries. When a directory entry is deleted or never
+        // used the name field starts with a null terminator. We want to
+        // skip these "holes" in the directory and only return valid entries.
+        if (currentEntry->name[0] == '\0') {
+            dirp->dirEntryPosition++;
+            continue;
+        }
+        
+        // Only allocate the return structure when we
+        // actually find a valid entry. This saves memory if someone opens
+        // a directory but never reads from it.
+        if (dirp->di == NULL) {
+            dirp->di = (struct fs_diriteminfo *)
+                malloc(sizeof(struct fs_diriteminfo));
+            if (dirp->di == NULL) {
+                return NULL;
+            }
+        }
+        
+        // Copy the entrys name into our return structure. We use strncpy
+        // to safely copy up to 255 characters leaving room for the null
+        // terminator in the 256-character buffer.
+        strncpy(dirp->di->d_name, currentEntry->name, 255);
+        dirp->di->d_name[255] = '\0'; // Ensure null termination
+        
+        // Set the file type based on the isDir flag. This tells the caller
+        // whether this entry is a directory can contain other files or
+        // a regular file (contains data).
+        if (currentEntry->isDir == 1) {
+            dirp->di->fileType = FT_DIRECTORY;
+        } else {
+            dirp->di->fileType = FT_REGFILE;
+        }
+        
+        // Set the record length to the size of a directory entry. This
+        // is useful information for the caller.
+        dirp->di->d_reclen = sizeof(DE);
+        
+        // Advance our position counter so the next call to readdir will
+        // return the next entry in the directory.
+        dirp->dirEntryPosition++;
+        
+        // Return the information about this entry. Note: we return "." and
+        // ".." entries too 
+        return dirp->di;
+    }
+    
+    // Reached the end of the directory ... no more entries to return
+    return NULL;
+}
+
 int fs_closedir(fdDir *dirp);
 
 // Joe 
