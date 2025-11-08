@@ -200,12 +200,81 @@ fdDir * fs_opendir(const char *pathname){
     dirp->dirEntryPosition = 0;
     dirp->directory = targetDir;
     dirp->d_reclen = sizeof(DE);
+    dirp->totalEntries = totalEntries; // Store for efficiency in readdir
     dirp->di = NULL;
     
     return dirp;
 }
 
-struct fs_diriteminfo *fs_readdir(fdDir *dirp);
+// Returns the next directory entry each time it's called. When there
+// are no more entries it returns NULL to signal the end.
+struct fs_diriteminfo *fs_readdir(fdDir *dirp){
+    // Input validation: need a valid directory descriptor and directory
+    if (dirp == NULL || dirp->directory == NULL) {
+        return NULL;
+    }
+    
+    // Use the totalEntries we calculated and stored in opendir. This
+    // avoids recalculating it every time readdir is called, which is
+    // more efficient
+    
+    // Loop through entries starting from our current position. We keep
+    // going until we've checked all possible entry slots
+    while (dirp->dirEntryPosition < dirp->totalEntries) {
+        // Get a pointer to the current directory entry we are examining
+        DE *currentEntry = &dirp->directory[dirp->dirEntryPosition];
+        
+        // Skip empty entries. When a directory entry is deleted or never
+        // used the name field starts with a null terminator. We want to
+        // skip these "holes" in the directory and only return valid entries.
+        if (currentEntry->name[0] == '\0') {
+            dirp->dirEntryPosition++;
+            continue;
+        }
+        
+        // Only allocate the return structure when we
+        // actually find a valid entry. This saves memory if someone opens
+        // a directory but never reads from it.
+        if (dirp->di == NULL) {
+            dirp->di = (struct fs_diriteminfo *)
+                malloc(sizeof(struct fs_diriteminfo));
+            if (dirp->di == NULL) {
+                return NULL;
+            }
+        }
+        
+        // Copy the entrys name into our return structure. We use strncpy
+        // to safely copy up to 255 characters leaving room for the null
+        // terminator in the 256-character buffer.
+        strncpy(dirp->di->d_name, currentEntry->name, 255);
+        dirp->di->d_name[255] = '\0'; // Ensure null termination
+        
+        // Set the file type based on the isDir flag. This tells the caller
+        // whether this entry is a directory can contain other files or
+        // a regular file (contains data).
+        if (currentEntry->isDir == 1) {
+            dirp->di->fileType = FT_DIRECTORY;
+        } else {
+            dirp->di->fileType = FT_REGFILE;
+        }
+        
+        // Set the record length to the size of a directory entry. This
+        // is useful information for the caller.
+        dirp->di->d_reclen = sizeof(DE);
+        
+        // Advance our position counter so the next call to readdir will
+        // return the next entry in the directory.
+        dirp->dirEntryPosition++;
+        
+        // Return the information about this entry. Note: we return "." and
+        // ".." entries too 
+        return dirp->di;
+    }
+    
+    // Reached the end of the directory ... no more entries to return
+    return NULL;
+}
+
 int fs_closedir(fdDir *dirp);
 
 // Joe 
