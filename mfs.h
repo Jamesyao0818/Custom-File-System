@@ -89,8 +89,8 @@ typedef struct parsePathInfo {
 
 // Helper functions;
 // Enrique
-int findInDir(DE *dir, const char *name);
-int isDEaDir();
+int findInDirectory(DE * directory, char * token);
+// int isDEaDir();
 
 // Joe
 DE *loadDirectory(const DE *dirEntry);

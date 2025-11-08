@@ -348,7 +348,7 @@ int fs_isFile(char * filename){
     parsePathInfo ppi;
     if (parsePath(filename, &ppi) != 0); 
     printf("Error in fs_isFile: Invalid path\n");
-    int index = findInDir(ppi.parent, filename);
+    int index = findInDirectory(ppi.parent, filename);
     if (ppi.parent[index].isDir != 1) return 1;
     return 0;
 }
@@ -489,7 +489,7 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
             return -2; // invalid path
         } 
 
-        if (!isDEaDir(&parent[idx])) {
+        if (!parent[idx].isDir) {
             return -3; // invalid path (can't be file in middle)
         } 
         DE *tempParent = loadDirectory(&parent[idx]);
@@ -507,38 +507,77 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
 }
 
 int fs_mkdir(const char *pathname, mode_t mode) {
+    printf("DEBUG: fs_mkdir called with path: %s\n", pathname);
+    
     // working copy of string
     char * pathCopy = strdup(pathname);
+    printf("DEBUG: pathCopy created: %s\n", pathCopy);
 
     // get ppi
     parsePathInfo ppi;
+    printf("DEBUG: Calling parsePath...\n");
     if (parsePath(pathCopy, &ppi) != 0) {
+        printf("DEBUG: parsePath failed!\n");
+        free(pathCopy);
         return -1;
     }
+    printf("DEBUG: parsePath succeeded. parent=%p, lastElementName=%s, index=%d\n", 
+           ppi.parent, ppi.lastElementName, ppi.index);
 
     // get vcb for blockSize
+    printf("DEBUG: Getting VCB...\n");
     struct VCB * vcb = getVCB();
+    if (!vcb) {
+        printf("DEBUG: getVCB returned NULL!\n");
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -1;
+    }
+    printf("DEBUG: VCB obtained, blockSize=%d\n", vcb->blockSize);
     
+    printf("DEBUG: Calling createDir...\n");
     DE * newDir = createDir(2, ppi.parent, vcb->blockSize);
+    if (!newDir) {
+        printf("DEBUG: createDir failed!\n");
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -1;
+    }
+    printf("DEBUG: createDir succeeded. newDir=%p\n", newDir);
 
     // update the new dir's . entry
+    printf("DEBUG: Updating directory name from '.' to '%s'\n", ppi.lastElementName);
     strcpy(newDir[0].name, ppi.lastElementName);
 
     // find a free index to put this entry in the parent
+    printf("DEBUG: Finding free index in parent...\n");
     int freeIndex = -1;
     int numEntries = ppi.parent[0].numBytes / sizeof(DE);
+    printf("DEBUG: Parent has %d entries\n", numEntries);
     for (int i = 2; i < numEntries; i++) {
         if (ppi.parent[i].name[0] == '\0') {
             freeIndex = i;
+            printf("DEBUG: Found free index at %d\n", i);
             break;
         }
     }
 
     if (freeIndex == -1) {
-        return -2; // parent has no more room for entries
+        printf("DEBUG: No free index found in parent!\n");
+        free(newDir);
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -2;
     }
 
     time_t now = time(NULL);
+    printf("DEBUG: Adding entry to parent at index %d\n", freeIndex);
 
     // add entry to parent's free directory entry index
     strcpy(ppi.parent[freeIndex].name, ppi.lastElementName);
@@ -554,10 +593,12 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     // this modified the parent, so update its mod time
     ppi.parent[0].modifyDate = now;
 
+    printf("DEBUG: Writing directories to disk...\n");
     // commit changes to disk
     writeDirToDisk(ppi.parent, vcb->blockSize);
     writeDirToDisk(newDir, vcb->blockSize);
     
+    printf("DEBUG: Cleaning up memory...\n");
     free(newDir);
     free(pathCopy);
 
@@ -565,5 +606,6 @@ int fs_mkdir(const char *pathname, mode_t mode) {
         free(ppi.parent);
     }
 
+    printf("DEBUG: fs_mkdir completed successfully!\n");
     return 0;
 }
