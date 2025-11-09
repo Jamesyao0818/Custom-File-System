@@ -4,7 +4,7 @@
 
 #include "vector.h"
 
-static void initVector(stringBuilder* v){
+void initVector(stringBuilder* v){
     v->subStrings = NULL;
     // How many elements vector can hold
     v->capacity = 0;

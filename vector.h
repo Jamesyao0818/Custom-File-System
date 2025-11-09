@@ -10,7 +10,7 @@ typedef struct stringBuilder{
 } stringBuilder;
 
 //Vector functions
-static void initVector(stringBuilder* v);
+void initVector(stringBuilder* v);
 int vectorAdd(stringBuilder* v, const char * substring);
 char * build(const stringBuilder *v, char separator);
 void freeVector(stringBuilder *v);
