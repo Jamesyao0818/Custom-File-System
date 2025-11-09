@@ -91,45 +91,21 @@ fdDir * fs_opendir(const char *pathname){
     // like opening "/" for root. This is how parsePath indicates that
     // the path refers to a directory rather than something inside it.
     if (ppi.index == -2) {
-        // Check if the parent directory is already loaded in memory
-        if (ppi.parent != NULL) {
-            // Use the already-loaded directory either cached or loaded
-            // by parsePath during path traversal
-            targetDir = ppi.parent;
-            // Mark as cached if it matches our global cache pointers
-            if (targetDir == alreadyLoadedRootDir || 
-                targetDir == alreadyLoadedCWD) {
-                isCached = 1;
-            }
-        } else {
-            // Root directory hasn't been loaded yet, so we need to read
-            // it from disk. We get the block location from the VCB
-            // (Volume Control Block) which stores filesystem metadata.
-            struct VCB* vcb = getVCB();
-            if (vcb == NULL) {
-                return NULL;
-            }
-            
-            // Read the root directory block from disk using LBAread
-            // (Logical Block Address read). The root directory is stored
-            // at a specific block location defined in the VCB.
-            int blockSize = vcb->blockSize;
-            int rootBlock = vcb->blockIndexRootDirectory;
-            char *buffer = (char *)malloc(blockSize);
-            if (buffer == NULL) {
-                return NULL;
-            }
-            
-            u_int64_t blocksRead = LBAread(buffer, 1, rootBlock);
-            if (blocksRead != 1) {
-                free(buffer);
-                return NULL;
-            }
-            
-            // Cast the buffer to a directory entry array and cache it
-            // for future use (so we don't have to read from disk again)
-            targetDir = (DE *)buffer;
-            alreadyLoadedRootDir = targetDir;
+        // This means we're opening the parent directory itself like "/" for root.
+        // Root directory should have been loaded in initFileSystem so ppi.parent
+        // should point to alreadyLoadedRootDir. If NULL, indicates a
+        // root wasn't loaded during initialization.
+        if (ppi.parent == NULL) {
+            printf("Error: fs_opendir - root directory not loaded. "
+                   "initFileSystem must be called first.\n");
+            return NULL;
+        }
+        
+        // Use the already loaded directory (cached in initFileSystem)
+        targetDir = ppi.parent;
+        // Mark as cached if it matches our global cache pointers
+        if (targetDir == alreadyLoadedRootDir || 
+            targetDir == alreadyLoadedCWD) {
             isCached = 1;
         }
     } else if (ppi.index >= 0) {
@@ -647,4 +623,54 @@ int fs_mkdir(const char *pathname, mode_t mode) {
 
     printf("DEBUG: fs_mkdir completed successfully!\n");
     return 0;
+}
+
+// Loads the root directory from disk into memory and caches it.
+// This should be called during filesystem initialization to ensure
+// root directory is always available for path parsing operations.
+// Returns 0 on success, -1 on error.
+int loadRootDirectory(void) {
+    // Check if root directory is already loaded
+    if (alreadyLoadedRootDir != NULL) {
+        return 0; // Already loaded nothing to do
+    }
+    
+    // Get VCB to find root directory location
+    struct VCB* vcb = getVCB();
+    if (vcb == NULL) {
+        printf("Error: loadRootDirectory - VCB not loaded\n");
+        return -1;
+    }
+    
+    // Get root directory block location from VCB
+    int blockSize = vcb->blockSize;
+    int rootBlock = vcb->blockIndexRootDirectory;
+    
+    // Allocate buffer to read root directory block
+    char *buffer = (char *)malloc(blockSize);
+    if (buffer == NULL) {
+        printf("Error: loadRootDirectory - malloc failed\n");
+        return -1;
+    }
+    
+    // Read root directory block from disk using LBAread
+    // The root directory is stored at a specific block 
+    // location defined in the VCB.
+    u_int64_t blocksRead = LBAread(buffer, 1, rootBlock);
+    if (blocksRead != 1) {
+        printf("Error: loadRootDirectory - failed to read root "
+               "directory block %d\n", rootBlock);
+        free(buffer);
+        return -1;
+    }
+    
+    // Cast the buffer to a directory entry array and cache it
+    // This ensures root directory is always available for 
+    // parsePath and other operations.
+    alreadyLoadedRootDir = (DE *)buffer;
+    
+    // Also set CWD to root initially since we start at root
+    alreadyLoadedCWD = alreadyLoadedRootDir;
+    
+    return 0; // Success
 }

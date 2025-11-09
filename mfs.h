@@ -87,6 +87,10 @@ typedef struct parsePathInfo {
 	int index; // -1 indicates it does not exist.
 } parsePathInfo;
 
+// Global variables for cached directories (defined in mfs.c)
+extern DE *alreadyLoadedRootDir;
+extern DE *alreadyLoadedCWD;
+
 // Helper functions;
 // Enrique
 int findInDirectory(DE * directory, char * token);
@@ -94,6 +98,7 @@ int findInDirectory(DE * directory, char * token);
 
 // Joe
 DE *loadDirectory(const DE *dirEntry);
+int loadRootDirectory(void);  // Load root directory into memory
 
 // Ian
 int parsePath(char * pathName, parsePathInfo *ppi);
