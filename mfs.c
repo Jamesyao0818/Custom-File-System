@@ -16,6 +16,7 @@
 #include "mfs.h"
 #include "VCB.h"
 #include "fsLow.h"
+#include "vector.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -43,6 +44,16 @@ int findInDirectory(DE * directory, char * token) {
     }
 
     // not found
+    return -1;
+}
+
+int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
+    for (int i = 2; i < entryCount; i++) {                 // skip '.' and '..'
+        if (parent[i].name[0] == '\0') continue;           // empty slot
+        if (parent[i].isDir && parent[i].blockNumber == childHeadBlock) {
+            return i;
+        }
+    }
     return -1;
 }
 
@@ -136,7 +147,7 @@ fdDir * fs_opendir(const char *pathname){
         // A valid index means we found a directory entry inside a parent
         // directory. We need to get a pointer to that entry.
         DE *dirEntry = &ppi.parent[ppi.index];
-        
+        int isDEaDir();
         // Safety check: make sure this entry is actually a directory and
         // not a regular file. You can't iterate through a file!
         if (dirEntry->isDir != 1) {
@@ -230,7 +241,16 @@ struct fs_diriteminfo *fs_readdir(fdDir *dirp){
         if (currentEntry->name[0] == '\0') {
             dirp->dirEntryPosition++;
             continue;
+        }// Find the child’s entry in parent by matching the child’s head block.
+int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
+    for (int i = 2; i < entryCount; i++) {                 // skip '.' and '..'
+        if (parent[i].name[0] == '\0') continue;           // empty slot
+        if (parent[i].isDir && parent[i].blockNumber == childHeadBlock) {
+            return i;
         }
+    }
+    return -1;
+}
         
         // Only allocate the return structure when we
         // actually find a valid entry. This saves memory if someone opens
@@ -318,60 +338,63 @@ int fs_closedir(fdDir *dirp){
 
 // Joe 
 // Misc directory functions
+// PWD
 char * fs_getcwd(char *pathname, size_t size){
-    /*// /Home/Documents/HW/csc..filesystem/
-    if (!pathname || size == 0)
+    // Invalid parameter checks.
+    if (!pathname || size == 0){
         return NULL;
-    if (!alreadyLoadedCWD || !alreadyLoadedRootDir)
+    }
+    if (!alreadyLoadedCWD || !alreadyLoadedRootDir) {
         return NULL;
-    if (alreadyLoadedCWD[0].blockNumber == alreadyLoadedRootDir[0]){
+    }
+
+    // /Home/Documents/HW/csc..filesystem/
+    // Edge case: if he CWD is the root, return "/"
+    DE * cwd = alreadyLoadedCWD;
+    if (cwd[0].blockNumber == cwd[1].blockNumber){
         if (size < 2) return NULL;
         pathname[0] = '/';
-        pathname[1] = '/0';
+        pathname[1] = '\0';
         return pathname;
     }
-    // csc-filesystem...
-    // Home/..
-    // ^ length of this
-    // add to start buffer becasue just a pointer
-    // move lenght into that 
-    // /Documents
-    // ./../foo/bar/bla/.. 
-    // Home/bar
-    char *buf = malloc(size);
-    memset(buf, 0, size);
-    DE * currentDir = alreadyLoadedCWD; 
-    strcat(buf, alreadyLoadedCWD->name);
-    // csc-filesystem
-    strcat(buf, "/");
-    // csc-filesystem/
-    while (currentDir[1].name != alreadyLoadedRootDir->name){
-        strcat(buf, currentDir[1].name);
-        // csc-filesystem/HW
-        strcat(buf, "/");
-        // csc-filesystem/HW/
-        currentDir = currentDir[1];
-        strcat(buf, currentDir[1].name);
-        // csc-filesystem/HW/Documents
-        strcat(buf, "/");
-        // csc-filesystem/HW/Documents/
-    }
-    char ** arrayOfSubStrings = malloc(size * 8);
-    int index = 0;
-    if (arrayOfSubStrings[i] != "." || arrayOfSubStrings[i] != ".." ) index++;
-    char * token = strtok(buf, "/");
-    // "/" "csc-filesystem" "/" .....
-    while (!token){
-        arrayOfSubStrings[index] = token;
-    }
 
-    // buffer cscfilesystem/HW/Documents/Home/
-    // buffer cscfilesystem*HW*Documents*Home*/
-    //return buf;
-    return NULL; 
+    stringBuilder parts; 
+    initVector(&parts);
+    DE * currentDir = cwd;
+    DE * parent = NULL;
+
+    // Walk back recursively along directory entries tree.
+    do {
+        int parentBlock = currentDir[1].blockNumber;
+        DE *parent = loadDirectory(&currentDir[1]);
+        vectorAdd(&parts, parent->name);
+        currentDir = parent;
+        // Only instance where "." and ".." share blockNumber will be root.
+        // So we know we're done.
+    } while (parent[0].blockNumber != parent[1].blockNumber);
+
+
+    // Now that we have added to the vector starting from cwd working up to root.
+    // The vector's substrings are in reverse order. So now we loop and reverse.
+    // Them to get them in our desired order.
+    if (parts.size > 1) {
+       size_t endIndex = parts.size - 1;
+       size_t startIndex = 0;
+       while (startIndex < endIndex){
+        char *tmp = parts.subStrings[startIndex];
+        parts.subStrings[startIndex] = parts.subStrings[endIndex];
+        parts.subStrings[endIndex] = tmp;
+        startIndex++;
+        endIndex--;
+       }
+    }
+    char *returnString = build(&parts, '/');
+    freeVector(&parts);
+    if (!returnString);
+    return returnString; 
 }
-
-//linux chdir
+// CD
+// linux chdir
 int fs_setcwd(char *pathname){
     if (!pathname || strlen(pathname) == 0) return 0;
     parsePathInfo ppi;
@@ -457,7 +480,7 @@ DE *loadDirectory(const DE *dirEntry){
     char *buffer = (char *)malloc(blockSize * blocksToRead);
     if (!buffer){
         printf("Error: malloc failue in LoadDirectory().\n");
-    }int isDEaDir();
+    }
     // Convert from logical block index to physical
     // Double check this part
     int physBlock = dirEntry->blockNumber - 1;

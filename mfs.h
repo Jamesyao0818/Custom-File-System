@@ -94,7 +94,7 @@ int findInDirectory(DE * directory, char * token);
 
 // Joe
 DE *loadDirectory(const DE *dirEntry);
-
+int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock);
 // Ian
 int parsePath(char * pathName, parsePathInfo *ppi);
 
