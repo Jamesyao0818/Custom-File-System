@@ -241,17 +241,8 @@ struct fs_diriteminfo *fs_readdir(fdDir *dirp){
         if (currentEntry->name[0] == '\0') {
             dirp->dirEntryPosition++;
             continue;
-        }// Find the child’s entry in parent by matching the child’s head block.
-int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
-    for (int i = 2; i < entryCount; i++) {                 // skip '.' and '..'
-        if (parent[i].name[0] == '\0') continue;           // empty slot
-        if (parent[i].isDir && parent[i].blockNumber == childHeadBlock) {
-            return i;
         }
-    }
-    return -1;
-}
-        
+        // Find the child’s entry in parent by matching the child’s head block.
         // Only allocate the return structure when we
         // actually find a valid entry. This saves memory if someone opens
         // a directory but never reads from it.
@@ -361,18 +352,36 @@ char * fs_getcwd(char *pathname, size_t size){
     stringBuilder parts; 
     initVector(&parts);
     DE * currentDir = cwd;
-    DE * parent = NULL;
-
+    DE * dirToFree = NULL;
     // Walk back recursively along directory entries tree.
-    do {
-        int parentBlock = currentDir[1].blockNumber;
+    while (1) {
         DE *parent = loadDirectory(&currentDir[1]);
-        vectorAdd(&parts, parent->name);
-        currentDir = parent;
+        if (!parent){
+            freeVector(&parts);
+            return NULL;
+        }
+        int index = (int)findChildByHeadBlock(parent, parent[0].numBytes/ sizeof(DE),currentDir[0].blockNumber);
+        if( index < 0){
+            free(parent);
+            freeVector(&parts);
+            return NULL;
+        }
+        if (vectorAdd(&parts, parent[index].name) != 0){
+            free(parent);
+            freeVector(&parts);
+            return NULL;
+        }
         // Only instance where "." and ".." share blockNumber will be root.
         // So we know we're done.
-    } while (parent[0].blockNumber != parent[1].blockNumber);
-
+        if (parent[0].blockNumber == parent[1].blockNumber){
+            free(parent);
+            free(dirToFree);
+            break;
+        }
+        free(dirToFree);
+        dirToFree = parent;
+        currentDir = parent;
+    } 
 
     // Now that we have added to the vector starting from cwd working up to root.
     // The vector's substrings are in reverse order. So now we loop and reverse.
@@ -389,9 +398,23 @@ char * fs_getcwd(char *pathname, size_t size){
        }
     }
     char *returnString = build(&parts, '/');
+    // Get length of string to return
+    size_t returnLength = strlen(returnString);
+    // So we can compare it to sized passed in.
+    // '/' "returnStringLength" '/' for instance that's why we add two.
+    if (returnLength + 2 > size){
+        free(returnString);
+        freeVector(&parts);
+        return NULL; //Buffer too small
+    }
+    // Now that we have correct return string and verified sufficien
+    // Space and pathname length. We just memcpy to buffer (pathname).
+    pathname[0] = '/';
+    memcpy(pathname +1, returnString, returnLength + 1);
+    // Free everthing now that we are done.
+    free(returnString);
     freeVector(&parts);
-    if (!returnString);
-    return returnString; 
+    return pathname;
 }
 // CD
 // linux chdir

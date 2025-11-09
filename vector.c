@@ -72,6 +72,8 @@ char * build(const stringBuilder *v, char separator){
     if (!returnString) return NULL;
     // Create a string which we will use to iterate along vector's substrings
     // and add sepator: '/'
+    // [string]
+    // home joe documents 
     char * position = returnString;
     for (size_t i = 0; i < v->size; i++){
         // So long as we aren't at the very first substring we add '/' first.
