@@ -63,6 +63,13 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			printf("Error: Failed to load FSM from disk.\n");
 			return -1;
 		} 
+		// Load root directory into memory so available for
+		// path parsing operations. Ensures parsePath can
+		// always find the root directory when processing absolute paths.
+		if (loadRootDirectory() != 0) {
+			printf("Error: Failed to load root directory\n");
+			return -1;
+		}
 		return 0;
 		} else {
 			// Fresh filestem path
@@ -80,10 +87,16 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			return -1;
 		}
 		// Create Root Directory (should allocate to block 7)
-		if (!createDir(2, NULL, blockSize)){
+		DE *rootDir = createDir(2, NULL, blockSize);
+		if (rootDir == NULL){
 			printf("Error: Failed to create directories.\n");
 			return -1;
 		}
+		// Cache the newly created root directory in memory.
+		// createDir returns a pointer to the directory in memory,
+		// so we can use it directly without reading from disk.
+		alreadyLoadedRootDir = rootDir;
+		alreadyLoadedCWD = rootDir;  // Start at root
 		return 0;
 	}
 }

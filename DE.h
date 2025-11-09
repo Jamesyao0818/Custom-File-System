@@ -17,6 +17,7 @@
 #define _DE_H
 #include <time.h>
 
+typedef struct LinkedList LinkedList;
 //Directory Entry Struct
 typedef struct DE {
     // Starting head of the file's location (for discontiguous files)
@@ -38,6 +39,8 @@ typedef struct DE {
     
     // For discontiguous storage, we need to track the chain of blocks
     int loc;  // Starting location in block allocation structure
+
+    LinkedList* blockList; // List of blocks allocated to this directory or file
 } DE;
 
 //Function Declarations
@@ -46,9 +49,9 @@ DE* createDir(int minEntries, DE *parent, int blockSize);
 
 //New function prototypes for discontiguous directory handling
 //blocklist-> linked list or array of block numbers allocated to the directory
-void writeDirToDiskDiscontiguous(const DE *dir, int blockSize, void* blockList);
+void writeDirToDiskDiscontiguous(const DE *dir, int blockSize, LinkedList* blockList);
 //Read directory from disk given starting block and number of blocks
-DE* readDirFromDiskDiscontiguous(int startBlock, int numBlocks, int blockSize);
+DE* readDirFromDiskDiscontiguous(LinkedList* blockList, int blockSize);
 //Create directory that can span multiple non-contiguous blocks
 DE* createDirDiscontiguous(int minEntries, DE *parent, int blockSize);
 
