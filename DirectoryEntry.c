@@ -17,11 +17,16 @@
     #include <time.h>
     #include <stdlib.h>
     #include <string.h>
+    #include <stdio.h>
+
     #include "fsLow.h"
     #include "FSM.h"
     #include "DE.h"
     #include "LinkedList.h"
     
+    // maybe change name to initiliazeRootDir
+    // becasue this is only being use to contiguous create dirs 
+    // which would only happen in intilization instance.
     DE* createDir(int minEntries, DE * parent, int blockSize) {
         //4a) How much memory neeeded
         //4b) Number of entries wanted is minEntries parameter.
@@ -53,10 +58,13 @@
             dir[i].blockNumber = -1;
             dir[i].loc = -1;
         }
-        
+        int rootPhys = 6;
         time_t now = time(NULL);
         //4f) Allocate blocks (one block for root directory)
-        int rootPhys = allocate(blockSize);
+        if (!parent) {
+            return NULL;
+        }
+
         if (rootPhys < 0) { free (dir); return NULL;}
 
         // Setup "." entry (current directory)
@@ -75,20 +83,20 @@
             parent = dir;
         }
 
-        //4h)
-        int parentPhys = parent->blockNumber;
-        
+        //4h)        
         strcpy(dir[1].name, "..");
         dir[1].numBytes = parent->numBytes;
         dir[1].isDir = 1;
         dir[1].createDate = dir[0].createDate;
         dir[1].modifyDate = dir[0].modifyDate;
         dir[1].accessDate = dir[0].accessDate;
-        dir[1].blockNumber = parentPhys;
-        dir[1].loc = parentPhys;
+        dir[1].blockNumber = rootPhys;
+        dir[1].loc = rootPhys;
         //4i)
         writeDirToDisk(dir, blockSize);
         //4j)
+        //printf("In createDir() : Root logical=%d physical=%d\n",
+       //v->blockIndexRootDirectory, v->blockIndexRootDirectory + 1);
         return dir;
     }
 

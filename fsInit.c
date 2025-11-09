@@ -27,6 +27,10 @@
 #include "FSM.h"
 #include "DE.h"
 
+//Globals for access between functions.
+DE *alreadyLoadedRootDir = NULL;
+DE *alreadyLoadedCWD = NULL;
+
 
 int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 {
@@ -63,14 +67,18 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			printf("Error: Failed to load FSM from disk.\n");
 			return -1;
 		} 
+		DE rootStub;
+		rootStub.isDir = 1;
+		rootStub.blockNumber = v->blockIndexRootDirectory;
+		alreadyLoadedRootDir = loadDirectory(&rootStub);
+		alreadyLoadedCWD = alreadyLoadedRootDir;
 		// Load root directory into memory so available for
 		// path parsing operations. Ensures parsePath can
 		// always find the root directory when processing absolute paths.
-		if (loadRootDirectory() != 0) {
-			printf("Error: Failed to load root directory\n");
-			return -1;
-		}
-		return 0;
+		//if (loadRootDirectory() != 0) {
+			//printf("Error: Failed to load root directory\n");
+			//return -1;
+		//}
 		} else {
 			// Fresh filestem path
 			// New filesystem - initialize and write VCB
@@ -80,25 +88,27 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			printf("Error: Failed to initialize VCB\n");
 			return -1;
 			}
+			}
+			// Initilize FSM (Mark 1..6 used; and write to blocks 2..6)
+			if(initFSM(blockSize) != 1){
+				printf("Error: Failed to initialize FSM\n");
+				return -1;
+			}
+			// Create Root Directory (should allocate to block 7)
+			DE *rootDir = createDir(2, NULL, blockSize);
+			if (rootDir == NULL){
+				printf("Error: Failed to create directories.\n");
+				return -1;
+			}
+			// Cache the newly created root directory in memory.
+			// createDir returns a pointer to the directory in memory,
+			// so we can use it directly without reading from disk.
+			alreadyLoadedRootDir = rootDir;
+			alreadyLoadedCWD = rootDir;
+			//alreadyLoadedRootDir = loadDirectory(&rootStub);
+			//alreadyLoadedCWD = rootDir;  // Start at root
 		}
-		// Initilize FSM (Mark 1..6 used; and write to blocks 2..6)
-		if(initFSM(blockSize) != 1){
-			printf("Error: Failed to initialize FSM\n");
-			return -1;
-		}
-		// Create Root Directory (should allocate to block 7)
-		DE *rootDir = createDir(2, NULL, blockSize);
-		if (rootDir == NULL){
-			printf("Error: Failed to create directories.\n");
-			return -1;
-		}
-		// Cache the newly created root directory in memory.
-		// createDir returns a pointer to the directory in memory,
-		// so we can use it directly without reading from disk.
-		alreadyLoadedRootDir = rootDir;
-		alreadyLoadedCWD = rootDir;  // Start at root
-		return 0;
-	}
+	return 0;
 }
 void exitFileSystem ()
 	{

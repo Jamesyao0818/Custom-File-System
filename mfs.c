@@ -23,8 +23,8 @@
 #include <stdlib.h>
 
 //Globals for access between functions.
-DE *alreadyLoadedRootDir = NULL;
-DE *alreadyLoadedCWD = NULL;
+//DE *alreadyLoadedRootDir = NULL;
+//DE *alreadyLoadedCWD = NULL;
 
 //IMPLEMENT THESE FUNCTIONS
 int findInDirectory(DE * directory, char * token) {
@@ -61,6 +61,59 @@ int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
 // Ian
 int fs_mkdir(const char *pathname, mode_t mode);
 int fs_rmdir(const char *pathname);
+
+// Joe
+DE *loadDirectory(const DE *dirEntry){
+    if (!dirEntry){
+        printf("Error: LoadDirectory called a NULL DE.\n");
+        return NULL;
+    }
+    // Print what we were asked to load (helps you spot the bad caller)
+    printf("loadDirectory(): name='%s' isDir=%d blockNumber(logical)=%d\n",
+           dirEntry->name, dirEntry->isDir, dirEntry->blockNumber);
+    if (dirEntry->isDir != 1){
+        printf("Error: LoadDirectory called on DE that is not a directory.\n");
+    }
+    // Use VCB to get block size.
+    struct VCB* v = getVCB();
+    /*int blockSize = v->blockSize;
+    // Calculate how many blocks we need to read for this directory.
+    int bytesToRead = (int)dirEntry->numBytes;
+    int blocksToRead = (bytesToRead + (blockSize - 1)) / blockSize;
+    int bytesToMalloc = blocksToRead * blockSize;
+    /*if (bytesToRead <= 0){
+        printf("Error: Invalid numBytes (%d) in DE\n", bytesToRead);
+        return NULL;
+    }*/
+    // Allocate memory for directory contents
+    char *buffer = (char *)malloc(v->blockSize);
+    if (!buffer){
+        printf("Error: malloc failue in LoadDirectory().\n");
+    }
+    // Convert from logical block index to physical
+    // Double check this part
+    int physBlock = dirEntry->blockNumber;
+    // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
+    u_int64_t blocksRead = LBAread(buffer, 1, physBlock);
+    if (blocksRead != 1) {
+        printf("Error: LoadDirectory failed to read 1 block (got %lu blocks).\n", blocksRead);
+        free (buffer);
+        return NULL;
+    }
+    // If read was done correctly, now we can just return the raw bytes of
+    // the dirEntry we want to load. Should work.
+    printf("In loadDirectory(): Root logical=%d physical=%d\n",
+       v->blockIndexRootDirectory, v->blockIndexRootDirectory + 1);
+    return (DE *)buffer;
+    // IN CASE THIS DOES NOT WORK TRY THIS.
+    /*
+    int numEntries = bytesToRead / sizeof(DE);
+    DE *dirArray = malloc(numEntries * sizeof(DE));
+    memcpy(dirArray, buffer, numEntries * sizeof(DE));
+    free(buffer);
+    return dirArray;
+    */
+}
 
 // Enrique
 // Directory iteration functions
@@ -328,7 +381,6 @@ char * fs_getcwd(char *pathname, size_t size){
     stringBuilder parts; 
     initVector(&parts);
     DE * currentDir = cwd;
-    DE * dirToFree = NULL;
     // Walk back recursively along directory entries tree.
     while (1) {
         DE *parent = loadDirectory(&currentDir[1]);
@@ -351,11 +403,12 @@ char * fs_getcwd(char *pathname, size_t size){
         // So we know we're done.
         if (parent[0].blockNumber == parent[1].blockNumber){
             free(parent);
-            free(dirToFree);
             break;
         }
-        free(dirToFree);
-        dirToFree = parent;
+        // Free current only if it wasn't dynamically loaded.
+        if (cwd != alreadyLoadedCWD && cwd != alreadyLoadedRootDir){
+            free(cwd);
+        }
         currentDir = parent;
     } 
 
@@ -453,54 +506,6 @@ int fs_stat(const char *path, struct fs_stat *buf){
     buf->st_modtime = targetDE->modifyDate;
     buf->st_createtime = targetDE->createDate;
     return 0; // Success
-}
-
-// Joe
-DE *loadDirectory(const DE *dirEntry){
-    if (!dirEntry){
-        printf("Error: LoadDirectory called a NULL DE.\n");
-        return NULL;
-    }
-    if (dirEntry->isDir != 1){
-        printf("Error: LoadDirectory called on DE that is not a directory.\n");
-    }
-    // Use VCB to get block size.
-    struct VCB* v = getVCB();
-    int blockSize = v->blockSize;
-    // Calculate how many blocks we need to read for this directory.
-    int bytesToRead = (int)dirEntry->numBytes;
-    int blocksToRead = (bytesToRead + (blockSize - 1)) / blockSize;
-    int bytesToMalloc = blocksToRead * blockSize;
-    if (bytesToRead <= 0){
-        printf("Error: Invalid numBytes (%d) in DE\n", bytesToRead);
-        return NULL;
-    }
-    // Allocate memory for directory contents
-    char *buffer = (char *)malloc(blockSize * blocksToRead);
-    if (!buffer){
-        printf("Error: malloc failue in LoadDirectory().\n");
-    }
-    // Convert from logical block index to physical
-    // Double check this part
-    int physBlock = dirEntry->blockNumber - 1;
-    // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
-    u_int64_t blocksRead = LBAread(buffer, blocksToRead, physBlock);
-    if (blocksRead != (u_int64_t)blocksToRead) {
-        printf("Error: LoadDirectory failed to read: %d blocks (needed to read: %lu blocks).\n", blocksToRead, blocksRead);
-        free (buffer);
-        return NULL;
-    }
-    // If read was done correctly, now we can just return the raw bytes of
-    // the dirEntry we want to load. Should work.
-    return (DE *)buffer;
-    // IN CASE THIS DOES NOT WORK TRY THIS.
-    /*
-    int numEntries = bytesToRead / sizeof(DE);
-    DE *dirArray = malloc(numEntries * sizeof(DE));
-    memcpy(dirArray, buffer, numEntries * sizeof(DE));
-    free(buffer);
-    return dirArray;
-    */
 }
 
 // Ian

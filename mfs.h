@@ -37,6 +37,10 @@ typedef u_int64_t uint64_t;
 typedef u_int32_t uint32_t;
 #endif
 
+//Globals for access between functions.
+extern DE *alreadyLoadedRootDir;
+extern DE *alreadyLoadedCWD;
+
 // This structure is returned by fs_readdir to provide the caller with information
 // about each file as it iterates through a directory
 struct fs_diriteminfo
