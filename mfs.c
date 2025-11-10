@@ -69,8 +69,8 @@ DE *loadDirectory(const DE *dirEntry){
         return NULL;
     }
     // Print what we were asked to load (helps you spot the bad caller)
-    printf("loadDirectory(): name='%s' isDir=%d blockNumber(logical)=%d\n",
-           dirEntry->name, dirEntry->isDir, dirEntry->blockNumber);
+    //printf("loadDirectory(): name='%s' isDir=%d blockNumber(logical)=%d\n",
+           //dirEntry->name, dirEntry->isDir, dirEntry->blockNumber-1);
     if (dirEntry->isDir != 1){
         printf("Error: LoadDirectory called on DE that is not a directory.\n");
     }
@@ -93,6 +93,7 @@ DE *loadDirectory(const DE *dirEntry){
     // Convert from logical block index to physical
     // Double check this part
     int physBlock = dirEntry->blockNumber;
+    printf("In loadDirectory(): lbaReading block number : %d\n", physBlock);
     // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
     u_int64_t blocksRead = LBAread(buffer, 1, physBlock);
     if (blocksRead != 1) {
@@ -102,8 +103,8 @@ DE *loadDirectory(const DE *dirEntry){
     }
     // If read was done correctly, now we can just return the raw bytes of
     // the dirEntry we want to load. Should work.
-    printf("In loadDirectory(): Root logical=%d physical=%d\n",
-       v->blockIndexRootDirectory, v->blockIndexRootDirectory + 1);
+    //printf("In loadDirectory(): Root logical=%d physical=%d\n",
+       //v->blockIndexRootDirectory, v->blockIndexRootDirectory + 1);
     return (DE *)buffer;
     // IN CASE THIS DOES NOT WORK TRY THIS.
     /*

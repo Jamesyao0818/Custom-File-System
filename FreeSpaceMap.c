@@ -87,7 +87,7 @@ int allocate(int blockSize) {
 void fsmWrite() {
     if(fsm != NULL) {
         // write 5 blocks to disk starting from block 1
-        LBAwrite(fsm, 5, 2);
+        LBAwrite(fsm, 5, 1);
     }
 }
 
@@ -99,7 +99,7 @@ int loadFSM (int blockSize, unsigned int startBlock){
     }
     fsm = (char*)malloc(numBytes);
     if (!fsm) return -1;
-    uint64_t blocksRead = LBAread(fsm, 5, startBlock + 1); //convert to physical
+    uint64_t blocksRead = LBAread(fsm, 5, startBlock); //convert to physical
     if (blocksRead != 5){
         free(fsm);
         fsm = NULL;

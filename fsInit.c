@@ -96,16 +96,19 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 				return -1;
 			}
 			// Create Root Directory (should allocate to block 7)
-			DE *rootDir = createDir(2, NULL, blockSize);
-			if (rootDir == NULL){
+			DE *rootDir = createDir(2, rootDir, blockSize);
+			/*if (rootDir == NULL){
 				printf("Error: Failed to create directories.\n");
 				return -1;
-			}
+			}*/
 			// Cache the newly created root directory in memory.
 			// createDir returns a pointer to the directory in memory,
 			// so we can use it directly without reading from disk.
 			struct VCB *v = getVCB();
-			v->blockIndexRootDirectory = rootDir[0].blockNumber;
+			rootDir[0].blockNumber = v->blockIndexRootDirectory;
+			rootDir[0].loc = v->blockIndexRootDirectory;
+			rootDir[1].blockNumber = v->blockIndexRootDirectory;
+			rootDir[1].loc = v->blockIndexRootDirectory;
 			writeVCB();
 			alreadyLoadedCWD = rootDir;
 			alreadyLoadedRootDir = rootDir;

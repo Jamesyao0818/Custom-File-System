@@ -54,11 +54,11 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	
 	// Due to partition table being at physical block address 0, vcb is at lba 0, but really pba 1.
 	// Subsequently fsm is at lba 1 pba 2.
-	vcb->blockIndexFSM = 1;
+	vcb->blockIndexFSM = 2;
 	
 	// Root directory will start after VCB (lba 0) and FSM (lba's 1-6)
-	// So root directory starts at lba 6.
-	vcb->blockIndexRootDirectory = 6;
+	// So root directory starts at lba 6 phys 7.
+	vcb->blockIndexRootDirectory = 7;
 
 	// Write VCB to disk at block 1
 	uint64_t blocksWritten = LBAwrite(buffer, 1, 0);
