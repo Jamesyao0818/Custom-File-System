@@ -29,6 +29,7 @@
 //DE *alreadyLoadedCWD = NULL;
 
 //IMPLEMENT THESE FUNCTIONS
+// Ian
 int findInDirectory(DE * directory, char * token) {
     // input validation
     if (directory == NULL || token == NULL) {
@@ -57,20 +58,6 @@ int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
         }
     }
     return -1;
-}
-
-char *trimString(char *pathname){
-    if (!pathname) return NULL;
-    // Trim from left when you see whitespace.
-    while (*pathname && isspace((unsigned char)*pathname))
-    pathname++;
-    // Create and buffer string to return adding bounds of another pathname
-    // So that we can trim from the right now.
-    char * rString = pathname + strlen(pathname);
-    while (rString > pathname && isspace((unsigned char)rString[-1]))
-    rString--;
-    *rString = '\0';
-    return pathname;
 }
 
 // Key directory functions
@@ -463,6 +450,7 @@ char * fs_getcwd(char *pathname, size_t size){
     freeVector(&parts);
     return pathname;
 }
+// Joe
 // CD
 // linux chdir
 int fs_setcwd(char *pathname){
@@ -496,7 +484,7 @@ int fs_setcwd(char *pathname){
     alreadyLoadedCWD = newCWD;
     return 0;
 }   
-
+// Joe
 // Returns 1 if file, 0 for dir, and -2 if called with bad parameters.
 int fs_isFile(char * filename){
     if (strcmp(filename, ".") == 0) return 0;
@@ -514,7 +502,7 @@ int fs_isFile(char * filename){
     }
     return 1;
 }
-
+// Joe
 // Returns 1 if directory, 0 otherwisepathname
 int fs_isDir(char * pathname){
     char *pathCopy = strdup(pathname);
@@ -558,7 +546,7 @@ int fs_stat(const char *path, struct fs_stat *buf){
     return 0; // Success
 }
 
-// Ian
+// Ian / Joe
 // Returns 0 for valid path, any non-zero number reflects a specific error.
 int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
     // is this a relative or absolute path?
@@ -633,7 +621,7 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
         token1 = token2;
     }
 }
-
+// Ian / Joe
 int fs_mkdir(const char *pathname, mode_t mode) {
     printf("DEBUG: fs_mkdir called with path: %s\n", pathname);
     
@@ -720,6 +708,9 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     ppi.parent[freeIndex].createDate = now;
     ppi.parent[freeIndex].accessDate = now;
     ppi.parent[freeIndex].modifyDate = now;
+    // THOUGHT FOR FUTURE
+    // SEE IF WE NEED TO ADD CHECK FOR FILE/DIR
+    // ASSIGN ISDIR APPROPRIATELY...
 
         if (ppi.parent[freeIndex].isDir == 1)
         printf("New entry is a directory\n");
@@ -742,54 +733,4 @@ int fs_mkdir(const char *pathname, mode_t mode) {
 
     printf("DEBUG: fs_mkdir completed successfully!\n");
     return 0;
-}
-
-// Loads the root directory from disk into memory and caches it.
-// This should be called during filesystem initialization to ensure
-// root directory is always available for path parsing operations.
-// Returns 0 on success, -1 on error.
-int loadRootDirectory(void) {
-    // Check if root directory is already loaded
-    if (alreadyLoadedRootDir != NULL) {
-        return 0; // Already loaded nothing to do
-    }
-    
-    // Get VCB to find root directory location
-    struct VCB* vcb = getVCB();
-    if (vcb == NULL) {
-        printf("Error: loadRootDirectory - VCB not loaded\n");
-        return -1;
-    }
-    
-    // Get root directory block location from VCB
-    int blockSize = vcb->blockSize;
-    int rootBlock = vcb->blockIndexRootDirectory;
-    
-    // Allocate buffer to read root directory block
-    char *buffer = (char *)malloc(blockSize);
-    if (buffer == NULL) {
-        printf("Error: loadRootDirectory - malloc failed\n");
-        return -1;
-    }
-    
-    // Read root directory block from disk using LBAread
-    // The root directory is stored at a specific block 
-    // location defined in the VCB.
-    u_int64_t blocksRead = LBAread(buffer, 1, rootBlock);
-    if (blocksRead != 1) {
-        printf("Error: loadRootDirectory - failed to read root "
-               "directory block %d\n", rootBlock);
-        free(buffer);
-        return -1;
-    }
-    
-    // Cast the buffer to a directory entry array and cache it
-    // This ensures root directory is always available for 
-    // parsePath and other operations.
-    alreadyLoadedRootDir = (DE *)buffer;
-    
-    // Also set CWD to root initially since we start at root
-    alreadyLoadedCWD = alreadyLoadedRootDir;
-    
-    return 0; // Success
 }
