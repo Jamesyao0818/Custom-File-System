@@ -45,7 +45,7 @@ typedef struct DE {
 
 //Function Declarations
 void writeDirToDisk(const DE *dir, int blockSize);
-DE* createDir(int minEntries, DE *parent, int blockSize);
+DE* createDir(int childLBA, int parentLBA, int minEntries, DE * parent, int blockSize);
 
 //New function prototypes for discontiguous directory handling
 //blocklist-> linked list or array of block numbers allocated to the directory

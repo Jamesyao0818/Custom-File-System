@@ -94,9 +94,10 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			if(initFSM(blockSize) != 1){
 				printf("Error: Failed to initialize FSM\n");
 				return -1;
-			}
+			}	
+			struct VCB *v = getVCB();
 			// Create Root Directory (should allocate to block 7)
-			DE *rootDir = createDir(2, rootDir, blockSize);
+			DE *rootDir = createDir(6,6,2, rootDir, v->blockSize);
 			/*if (rootDir == NULL){
 				printf("Error: Failed to create directories.\n");
 				return -1;
@@ -104,14 +105,17 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			// Cache the newly created root directory in memory.
 			// createDir returns a pointer to the directory in memory,
 			// so we can use it directly without reading from disk.
-			struct VCB *v = getVCB();
-			rootDir[0].blockNumber = v->blockIndexRootDirectory;
-			rootDir[0].loc = v->blockIndexRootDirectory;
-			rootDir[1].blockNumber = v->blockIndexRootDirectory;
-			rootDir[1].loc = v->blockIndexRootDirectory;
-			writeVCB();
+			int rootLBA = v->blockIndexRootDirectory;
+			writeDirToDisk(rootDir, v->blockSize);
+			rootDir[0].blockNumber = rootLBA;
+			rootDir[0].loc = rootLBA;
+			fsmReserveLBA(rootLBA);
+			fsmWrite();
+			rootDir[1].blockNumber = rootLBA;
+			rootDir[1].loc = rootLBA;
 			alreadyLoadedCWD = rootDir;
 			alreadyLoadedRootDir = rootDir;
+			writeVCB();
 			//alreadyLoadedRootDir = loadDirectory(&rootStub);
 			//alreadyLoadedCWD = rootDir;  // Start at root
 			return 0;

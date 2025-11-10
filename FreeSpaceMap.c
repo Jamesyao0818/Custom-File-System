@@ -115,3 +115,23 @@ void releaseBlock(int blocknum) {
     clearBit(blocknum);
     fsmWrite();
 }
+
+int fsmReserveLBA(int lba){ 
+    if (lba < 0 )
+        return -1;
+    setBit(lba); 
+    fsmWrite(); 
+    return 0; 
+}
+int fsmReleaseLBA(int lba){
+    if ( lba < 0 )
+        return -1;
+    clearBit(lba); 
+    fsmWrite(); 
+    return 0; 
+}
+int fsmIsUsed(int lba){ 
+    if ( lba < 0 )
+        return 1;
+    return getBit(lba); 
+}

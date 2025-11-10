@@ -17,10 +17,12 @@
 #include "VCB.h"
 #include "fsLow.h"
 #include "vector.h"
+#include "FSM.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 //Globals for access between functions.
 //DE *alreadyLoadedRootDir = NULL;
@@ -46,7 +48,7 @@ int findInDirectory(DE * directory, char * token) {
     // not found
     return -1;
 }
-
+// Joe
 int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
     for (int i = 2; i < entryCount; i++) {                 // skip '.' and '..'
         if (parent[i].name[0] == '\0') continue;           // empty slot
@@ -57,9 +59,22 @@ int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
     return -1;
 }
 
+char *trimString(char *pathname){
+    if (!pathname) return NULL;
+    // Trim from left when you see whitespace.
+    while (*pathname && isspace((unsigned char)*pathname))
+    pathname++;
+    // Create and buffer string to return adding bounds of another pathname
+    // So that we can trim from the right now.
+    char * rString = pathname + strlen(pathname);
+    while (rString > pathname && isspace((unsigned char)rString[-1]))
+    rString--;
+    *rString = '\0';
+    return pathname;
+}
+
 // Key directory functions
 // Ian
-int fs_mkdir(const char *pathname, mode_t mode);
 int fs_rmdir(const char *pathname);
 
 // Joe
@@ -76,17 +91,19 @@ DE *loadDirectory(const DE *dirEntry){
     }
     // Use VCB to get block size.
     struct VCB* v = getVCB();
-    /*int blockSize = v->blockSize;
+    int blockSize = v->blockSize;
     // Calculate how many blocks we need to read for this directory.
     int bytesToRead = (int)dirEntry->numBytes;
     int blocksToRead = (bytesToRead + (blockSize - 1)) / blockSize;
-    int bytesToMalloc = blocksToRead * blockSize;
+    if (blocksToRead <= 0) blocksToRead = 1;
     /*if (bytesToRead <= 0){
         printf("Error: Invalid numBytes (%d) in DE\n", bytesToRead);
         return NULL;
     }*/
     // Allocate memory for directory contents
-    char *buffer = (char *)malloc(v->blockSize);
+    size_t bytesToMalloc = (size_t)blocksToRead * (size_t)blockSize;
+    //int lba = dirEntry->blockNumber;
+    char *buffer = (char *)malloc(bytesToMalloc);
     if (!buffer){
         printf("Error: malloc failue in LoadDirectory().\n");
     }
@@ -95,7 +112,7 @@ DE *loadDirectory(const DE *dirEntry){
     int physBlock = dirEntry->blockNumber;
     printf("In loadDirectory(): lbaReading block number : %d\n", physBlock);
     // Make sure we also handle discontiguous instances. Pending James's Linked List implementation.
-    u_int64_t blocksRead = LBAread(buffer, 1, physBlock);
+    u_int64_t blocksRead = LBAread(buffer, blocksToRead, physBlock);
     if (blocksRead != 1) {
         printf("Error: LoadDirectory failed to read 1 block (got %lu blocks).\n", blocksRead);
         free (buffer);
@@ -449,30 +466,62 @@ char * fs_getcwd(char *pathname, size_t size){
 // CD
 // linux chdir
 int fs_setcwd(char *pathname){
+    //printf("Path name prior in setCwd():%s\n", pathname);
+    //char * cwdPath = fs_getcwd(pathname, sizeof(pathname));
+    //printf("Path name of cwd setCwd():%s\n", cwdPath);
     if (!pathname || strlen(pathname) == 0) return 0;
+    DE *child = NULL;
     parsePathInfo ppi;
-    if (parsePath(pathname, &ppi) != 0); 
+    if (parsePath(pathname, &ppi) != 0)
     printf("Error in fs_setcwd: Invalid path\n");
-    if (fs_isFile(ppi.parent->name) == 0)
-    alreadyLoadedCWD = ppi.parent;
+    int index = findInDirectory(ppi.parent, ppi.lastElementName);
+    if (!ppi.lastElementName){
+        //path already points to cwd
+        alreadyLoadedCWD = ppi.parent;
+        return 0;
+    }
+    if (ppi.parent[index].isDir != 1){
+        printf("fs_setcwd: %s is not a directory.\n", ppi.lastElementName);
+        return -1;
+    }
+    // Final element is dir and exists.
+    child = &ppi.parent[index];
+    printf("DEBUG cd: found '%s' at idx=%d, isDir=%d, startLBA=%d size=%d\n",
+       ppi.lastElementName, index, child->isDir,
+       child->blockNumber, child->numBytes);
+    if (!child){
+        printf("fs_setcwd: failed to load directory '%s'\n", ppi.lastElementName);
+    }
+    DE *newCWD = loadDirectory(child);
+    alreadyLoadedCWD = newCWD;
+    return 0;
 }   
 
-// Returns 1 if file, 0 otherwise;
+// Returns 1 if file, 0 for dir, and -2 if called with bad parameters.
 int fs_isFile(char * filename){
-    if (!filename || strlen(filename) == 0) return 0;
-    parsePathInfo ppi;
-    if (parsePath(filename, &ppi) != 0); 
-    printf("Error in fs_isFile: Invalid path\n");
-    int index = findInDirectory(ppi.parent, filename);
-    if (ppi.parent[index].isDir != 1) return 1;
-    return 0;
+    if (strcmp(filename, ".") == 0) return 0;
+    if (strcmp(filename, "..") == 0) return 0;
+    if (!filename || strlen(filename) == 0) return -2;
+    printf("File name in isFile():%s\n", filename);
+    DE *cwd = alreadyLoadedCWD;
+    int numEntries = cwd[0].numBytes / sizeof(DE);
+    for (int i = 2; i < numEntries; i++){
+        //Matching name
+        if(strcmp(cwd[i].name, filename) == 0){
+            if (cwd[i].isDir != 1)
+                return 0;
+        }
+    }
+    return 1;
 }
 
 // Returns 1 if directory, 0 otherwisepathname
 int fs_isDir(char * pathname){
+    char *pathCopy = strdup(pathname);
+    //printf("Pathname in isDir():%s\n", pathCopy);
     if (!pathname || strlen(pathname) == 0) return 0;
     parsePathInfo ppi;
-    if (parsePath(pathname, &ppi) != 0); 
+    if (parsePath(pathCopy, &ppi) != 0); 
     printf("Error in fs_isDir: Invalid path\n");
     return ppi.parent->isDir;
 }
@@ -513,6 +562,7 @@ int fs_stat(const char *path, struct fs_stat *buf){
 // Returns 0 for valid path, any non-zero number reflects a specific error.
 int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
     // is this a relative or absolute path?
+    //printf("In parsePath() pathname is :%s\n", pathName);
     DE * startParent;
     DE * parent;
     char * saveptr;
@@ -541,6 +591,9 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
             return -1;
         }
     }
+    if (strcmp(token1, ".") == 0){
+        token2 = strtok_r(NULL,"/",&saveptr);
+    }
 
     while (1)
     {
@@ -551,6 +604,14 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
             ppi->lastElementName = token1; // may need to do a strdup here depending
             ppi->index = idx;
             return 0;
+        }
+        if (strcmp(token1, "..") == 0){
+            if (parent[0].blockNumber != parent[1].blockNumber){
+                DE * goBack = loadDirectory(&parent[1]);
+                if (!goBack) return -4;
+                if (parent != startParent) free(parent);
+                parent = goBack;
+            }
         }
         if (idx == -1) {
             return -2; // invalid path
@@ -605,7 +666,9 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     printf("DEBUG: VCB obtained, blockSize=%d\n", vcb->blockSize);
     
     printf("DEBUG: Calling createDir...\n");
-    DE * newDir = createDir(2, ppi.parent, vcb->blockSize);
+    int childLBA = allocate(vcb->blockSize);
+    int parentLBA = ppi.parent[0].blockNumber;
+    DE * newDir = createDir(childLBA, parentLBA, 2, ppi.parent, vcb->blockSize);
     if (!newDir) {
         printf("DEBUG: createDir failed!\n");
         free(pathCopy);
@@ -617,9 +680,9 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     printf("DEBUG: createDir succeeded. newDir=%p\n", newDir);
 
     // update the new dir's . entry
-    printf("DEBUG: Updating directory name from '.' to '%s'\n", ppi.lastElementName);
-    strcpy(newDir[0].name, ppi.lastElementName);
+    //printf("DEBUG: Updating directory name from '.' to '%s'\n", ppi.lastElementName);
 
+    //newdir[0].isDir = 1;
     // find a free index to put this entry in the parent
     printf("DEBUG: Finding free index in parent...\n");
     int freeIndex = -1;
@@ -646,6 +709,7 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     time_t now = time(NULL);
     printf("DEBUG: Adding entry to parent at index %d\n", freeIndex);
 
+
     // add entry to parent's free directory entry index
     strcpy(ppi.parent[freeIndex].name, ppi.lastElementName);
     // update the parent's directory entry of this new dir
@@ -657,13 +721,16 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     ppi.parent[freeIndex].accessDate = now;
     ppi.parent[freeIndex].modifyDate = now;
 
+        if (ppi.parent[freeIndex].isDir == 1)
+        printf("New entry is a directory\n");
+    else printf("New entry is file\n");
     // this modified the parent, so update its mod time
     ppi.parent[0].modifyDate = now;
 
     printf("DEBUG: Writing directories to disk...\n");
     // commit changes to disk
-    writeDirToDisk(ppi.parent, vcb->blockSize);
     writeDirToDisk(newDir, vcb->blockSize);
+    writeDirToDisk(ppi.parent, vcb->blockSize);
     
     printf("DEBUG: Cleaning up memory...\n");
     free(newDir);
