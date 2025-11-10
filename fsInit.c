@@ -67,11 +67,12 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			printf("Error: Failed to load FSM from disk.\n");
 			return -1;
 		} 
-		DE rootStub;
+		DE rootStub = {0};
 		rootStub.isDir = 1;
 		rootStub.blockNumber = v->blockIndexRootDirectory;
 		alreadyLoadedRootDir = loadDirectory(&rootStub);
 		alreadyLoadedCWD = alreadyLoadedRootDir;
+		return 0;
 		// Load root directory into memory so available for
 		// path parsing operations. Ensures parsePath can
 		// always find the root directory when processing absolute paths.
@@ -103,12 +104,15 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			// Cache the newly created root directory in memory.
 			// createDir returns a pointer to the directory in memory,
 			// so we can use it directly without reading from disk.
-			alreadyLoadedRootDir = rootDir;
+			struct VCB *v = getVCB();
+			v->blockIndexRootDirectory = rootDir[0].blockNumber;
+			writeVCB();
 			alreadyLoadedCWD = rootDir;
+			alreadyLoadedRootDir = rootDir;
 			//alreadyLoadedRootDir = loadDirectory(&rootStub);
 			//alreadyLoadedCWD = rootDir;  // Start at root
+			return 0;
 		}
-	return 0;
 }
 void exitFileSystem ()
 	{

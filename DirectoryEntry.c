@@ -107,7 +107,7 @@
         int blocksToWrite = (dir[0].numBytes + blockSize - 1) / blockSize; // Should just be one.
         int blockIndex = dir[0].blockNumber;
         //printf("Dir block number: %d\n", dir[0].blockNumber);
-        LBAwrite((char*)dir, 1, dir->blockNumber - 1);
+        LBAwrite((char*)dir, 1, dir->blockNumber);
         /*for (int i = 0; i < blocksToWrite; i++){
             //int blockIndex = getNthBlockOfChain(dir->loc,i);
             
