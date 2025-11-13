@@ -37,19 +37,17 @@
 ROOTNAME=fsshell
 HW=
 FOPTION=
-RUNOPTIONS=SampleVolume 10000000 512
+# this was RUNOPTIONS=SampleVolume 10000000 512
+RUNOPTIONS=SampleVolume 200000 512
 CC=gcc
 CFLAGS= -g -I.
 LIBS =pthread
 DEPS = 
 # Add any additional objects to this list
 ADDOBJ= fsInit.o b_io.o VCB.o DirectoryEntry.o FreeSpaceMap.o mfs.o LinkedList.o vector.o
-ARCH  := $(shell uname -m)
-UNAME := $(shell uname -s)
+ARCH = $(shell uname -m)
 
 ifeq ($(ARCH),aarch64)
-  ARCHOBJ = fsLowM1.o
-else ifeq ($(ARCH),arm64)
   ARCHOBJ = fsLowM1.o
 else
   ARCHOBJ = fsLow.o
