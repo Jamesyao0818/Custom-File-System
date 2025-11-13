@@ -61,8 +61,6 @@ int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
 }
 
 // Key directory functions
-// Ian
-int fs_rmdir(const char *pathname);
 
 // Joe
 DE *loadDirectory(const DE *dirEntry){
@@ -509,13 +507,12 @@ int fs_isDir(char * pathname){
     //printf("Pathname in isDir():%s\n", pathCopy);
     if (!pathname || strlen(pathname) == 0) return 0;
     parsePathInfo ppi;
-    if (parsePath(pathCopy, &ppi) != 0); 
-    printf("Error in fs_isDir: Invalid path\n");
+    if (parsePath(pathCopy, &ppi) != 0){
+        printf("Error in fs_isDir: Invalid path : %s \n", pathname);
+        return -1;
+    }    
     return ppi.parent->isDir;
 }
-
-// Ian 
-int fs_delete(char* filename);	//removes a file
 
 // James
 int fs_stat(const char *path, struct fs_stat *buf){
@@ -732,5 +729,111 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     }
 
     printf("DEBUG: fs_mkdir completed successfully!\n");
+    return 0;
+}
+// Ian
+int fs_rmdir(const char *pathname) {
+    printf("DEBUG: fs_rmdir called with path: %s\n", pathname);
+    
+    // working copy of string
+    char * pathCopy = strdup(pathname);
+    printf("DEBUG: (rm_dir) pathCopy created: %s\n", pathCopy);
+
+    // get ppi
+    parsePathInfo ppi;
+    printf("DEBUG: (rmdir) Calling parsePath...\n");
+    if (parsePath(pathCopy, &ppi) != 0) {
+        printf("DEBUG: parsePath failed!\n");
+        free(pathCopy);
+        return -1;
+    }
+    printf("DEBUG: (rmdir) parsePath succeeded. parent=%p, lastElementName=%s, index=%d\n", 
+           ppi.parent, ppi.lastElementName, ppi.index);
+
+    // ensure this is a dir
+    if (!ppi.parent[ppi.index].isDir) {
+        printf("DEBUG: %s is not a directory!\n", ppi.lastElementName);
+
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -2; // not a dir
+    }
+
+    // load the dir to be deleted
+    printf("DEBUG: rmdir loading dir...\n");
+    DE * dirToDelete = loadDirectory(&ppi.parent[ppi.index]);
+
+    if (!dirToDelete) {
+        printf("DEBUG: rmdir Failed to load!!\n");
+
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -3; // failed to load
+    }
+
+    // ensure dir is empty except for . and .. (2 DEs)
+    int isEmpty = 1;
+    int numEntrySlots = dirToDelete[0].numBytes / sizeof(DE);
+    printf("DEBUG: Parent has %d entry slots\n", numEntrySlots);
+    for (int i = 2; i < numEntrySlots; i++) {
+        if (dirToDelete[i].name[0] != '\0') {
+            isEmpty = 0;
+            printf("DEBUG: Directory not empty, contains %s at index %d\n",dirToDelete[i].name, i);
+            
+            free(dirToDelete);
+            free(pathCopy);
+            if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+                free(ppi.parent);
+            }
+        return -4; // not empty
+        }
+    }
+
+    // get vcb for blockSize
+    printf("DEBUG: Getting VCB...\n");
+    struct VCB * vcb = getVCB();
+    if (!vcb) {
+        printf("DEBUG: getVCB returned NULL!\n");
+        free(pathCopy);
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+            free(dirToDelete);
+        }
+        return -1;
+    }
+    printf("DEBUG: VCB obtained, blockSize=%d\n", vcb->blockSize);
+    
+    // update fsm
+    fsmReleaseLBA(ppi.parent[ppi.index].blockNumber);
+
+    // clear entry in the parent
+    memset(&ppi.parent[ppi.index], 0, sizeof(DE)); 
+
+    time_t now = time(NULL);
+    // add entry to parent's free directory entry index
+    
+    ppi.parent[0].modifyDate = now;
+
+    printf("DEBUG: (rmdir) Writing updated parent to disk...\n");
+    // commit changes to disk
+    writeDirToDisk(ppi.parent, vcb->blockSize);
+    
+    printf("DEBUG: Cleaning up memory...\n");
+    free(dirToDelete);
+    free(pathCopy);
+
+    if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+        free(ppi.parent);
+    }
+
+    printf("DEBUG: fs_rmdir completed successfully!\n");
+    return 0;
+}
+// Ian
+int fs_delete(char* filename) {
     return 0;
 }
