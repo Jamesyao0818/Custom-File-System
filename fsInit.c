@@ -98,7 +98,7 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 			struct VCB *v = getVCB();
 			// Create Root Directory (should allocate to block 7)
 			u_int64_t rootLBA = v->blockIndexRootDirectory;
-			DE *rootDir = createDir(rootLBA, rootLBA, 2, rootDir, v->blockSize);
+			DE *rootDir = createDir(rootLBA, rootLBA, 2, NULL, v->blockSize);
 			/*if (rootDir == NULL){
 				printf("Error: Failed to create directories.\n");
 				return -1;
