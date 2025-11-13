@@ -33,12 +33,12 @@
         //4c) Multiply size of your directory entry by number of entry to get number of bytes needed.
         // Make sure we never have less then 2 directories.
         if (minEntries < 2) { minEntries = 2;}
-        int bytesNeeded = minEntries * (int)sizeof(DE);
+        size_t bytesNeeded = minEntries * (int)sizeof(DE);
         //4d) How many blocks needed.
-        int blocksNeeded = (bytesNeeded + (blockSize - 1)) / blockSize;
-        int bytesToMalloc = blocksNeeded * blockSize;
+        size_t blocksNeeded = (bytesNeeded + (blockSize - 1)) / blockSize;
+        size_t bytesToMalloc = blocksNeeded * blockSize;
         // How many entries could fit in that space
-        int actualEntriesCount = bytesToMalloc / (int)sizeof(DE);
+        size_t actualEntriesCount = bytesToMalloc / (int)sizeof(DE);
         if (blocksNeeded != 1) {
             //Multiple Block Dirs not implemented yet.
             return NULL;
@@ -61,9 +61,6 @@
         //int rootPhys = 6;
         time_t now = time(NULL);
         //4f) Allocate blocks (one block for root directory)
-        if (!parent) {
-            return NULL;
-        }
         if (childLBA < 0 || parentLBA < 0){
             free(dir);
             return NULL;
@@ -109,11 +106,11 @@
         //This version of writing directory is only writing one block.
         //For next milestone we will implement linked functionality to make it discontiguous.
         //Remember to refactor this function LATER!!!!
-        int blocksToWrite = (dir[0].numBytes + blockSize - 1) / blockSize; // Should just be one.
+        size_t blocksToWrite = (dir[0].numBytes + blockSize - 1) / blockSize; // Should just be one.
         if (blocksToWrite <= 0) blocksToWrite = 1;
-        int blockIndex = dir[0].blockNumber;
+        size_t blockIndex = dir[0].blockNumber;
         //printf("Dir block number: %d\n", dir[0].blockNumber);
-        printf("writeDirToDisk: writing : %d blocks to LBA: %d\n", blocksToWrite, dir->blockNumber);
+        printf("writeDirToDisk: writing : %ld blocks to LBA: %d\n", blocksToWrite, dir->blockNumber);
         LBAwrite((char*)dir, blocksToWrite, dir[0].blockNumber);
         /*for (int i = 0; i < blocksToWrite; i++){
             //int blockIndex = getNthBlockOfChain(dir->loc,i);

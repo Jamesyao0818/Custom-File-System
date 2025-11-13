@@ -72,7 +72,7 @@ static int getBit(int bitToGet) {
 
 // Returns the bit position of the next free block, and marks it as used
 // Gets free block
-int allocate(int blockSize) {
+u_int64_t allocate(int blockSize) {
     int totalBits = 5 * 8 * blockSize;
     for (int i = 0; i < totalBits; i++) {
         if(getBit(i) == 0) {
