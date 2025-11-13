@@ -46,10 +46,12 @@ DEPS =
 ADDOBJ= fsInit.o b_io.o VCB.o DirectoryEntry.o FreeSpaceMap.o mfs.o LinkedList.o vector.o
 ARCH = $(shell uname -m)
 
-ifeq ($(ARCH), aarch64)
-	ARCHOBJ=fsLowM1.o
+ifeq ($(ARCH),aarch64)
+  ARCHOBJ = fsLowM1.o
+else ifeq ($(ARCH),arm64)
+  ARCHOBJ = fsLowM1.o
 else
-	ARCHOBJ=fsLow.o
+  ARCHOBJ = fsLow.o
 endif
 
 OBJ = $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ARCHOBJ)
