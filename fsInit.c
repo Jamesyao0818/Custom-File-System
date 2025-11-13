@@ -32,18 +32,18 @@ DE *alreadyLoadedRootDir = NULL;
 DE *alreadyLoadedCWD = NULL;
 
 
-int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
-{
+int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
+
 	printf ("Initializing File System with %ld blocks with a block size of %ld\n", numberOfBlocks, blockSize);
 	/* TODO: Add any code you need to initialize your file system. */
 	// Check if filesystem already exists by reading block 0 and checking magic number
-	char* testBuffer = (char*)malloc(blockSize);
+	char* testBuffer = (char*)malloc((size_t)blockSize);
 	if (testBuffer == NULL){
 		printf("Error: Failed to allocate memory for filesystem check\n");
 		return -1;
 	}
 
-	memset(testBuffer, 0, blockSize);
+	memset(testBuffer, 0, (size_t)blockSize);
 	// Try to read VCB at block 1
 	uint64_t blocksRead = LBAread(testBuffer, 1, 0);
 
@@ -55,6 +55,8 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 		if (testVCB->MagicNo == VCB_MAGIC){ filesystemExists = 1;}
 	}
 	free(testBuffer);
+
+
 	// File system found path.
 	if (filesystemExists){
 		// Existing filesystem - read VCB from disk
@@ -85,10 +87,8 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			// New filesystem - initialize and write VCB
 			printf("New filesystem detected. Initializing VCB...\n");
 			if (initVCB(numberOfBlocks, blockSize) != 0){
-			{
 			printf("Error: Failed to initialize VCB\n");
 			return -1;
-			}
 			}
 			// Initilize FSM (Mark 1..6 used; and write to blocks 2..6)
 			if(initFSM(blockSize) != 1){
@@ -97,7 +97,8 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			}	
 			struct VCB *v = getVCB();
 			// Create Root Directory (should allocate to block 7)
-			DE *rootDir = createDir(6,6,2, rootDir, v->blockSize);
+			u_int64_t rootLBA = v->blockIndexRootDirectory;
+			DE *rootDir = createDir(rootLBA, rootLBA, 2, rootDir, v->blockSize);
 			/*if (rootDir == NULL){
 				printf("Error: Failed to create directories.\n");
 				return -1;
@@ -105,7 +106,6 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			// Cache the newly created root directory in memory.
 			// createDir returns a pointer to the directory in memory,
 			// so we can use it directly without reading from disk.
-			int rootLBA = v->blockIndexRootDirectory;
 			writeDirToDisk(rootDir, v->blockSize);
 			rootDir[0].blockNumber = rootLBA;
 			rootDir[0].loc = rootLBA;
@@ -119,7 +119,7 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize)
 			//alreadyLoadedRootDir = loadDirectory(&rootStub);
 			//alreadyLoadedCWD = rootDir;  // Start at root
 			return 0;
-		}
+		}	
 }
 void exitFileSystem ()
 	{
