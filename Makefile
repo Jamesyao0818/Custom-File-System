@@ -44,7 +44,8 @@ LIBS =pthread
 DEPS = 
 # Add any additional objects to this list
 ADDOBJ= fsInit.o b_io.o VCB.o DirectoryEntry.o FreeSpaceMap.o mfs.o LinkedList.o vector.o
-ARCH = $(shell uname -m)
+ARCH  := $(shell uname -m)
+UNAME := $(shell uname -s)
 
 ifeq ($(ARCH),aarch64)
   ARCHOBJ = fsLowM1.o
