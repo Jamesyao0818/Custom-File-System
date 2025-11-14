@@ -227,11 +227,19 @@
         return dir;
     }
 
+    // Joe + Ian
     DE* Touch(int childLBA, DE * parent, char * name) {
         if (!name){
         printf("Bad call of touch passed null name\n");
         return NULL;
         }
+
+        // call allocate to reflect this new file in fsm
+        if (allocate(childLBA) != 0) {
+            printf("DEBUG: Failed to allocate block: %d for new file", childLBA);
+            return NULL;
+        }
+
         int numEntries = parent[0].numBytes / sizeof(DE);
         if (numEntries <= 2){
             printf("Touch: Not enough entries found.\n");
@@ -261,7 +269,13 @@
         newEntry->createDate = now;
         newEntry->modifyDate = now;
         parent[0].modifyDate = now;
+
+        if(!LBAwrite(parent, 1, parent[0].blockNumber)) {
+            printf("DEBUG: (touch) Failed to LBAwrite to update parent!");
+            return NULL;
+        }
+
+        printf("DEBUG: touch success! made empty file %s at block %d", name, childLBA);
+
         return parent;
-        // MAKE SURE WHENEVER THIS IS CALLED TO THEN RIGHT TO DISK
-        // SO THAT CHANGES PERSIST ON DISK
      }
