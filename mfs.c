@@ -132,21 +132,11 @@ fdDir * fs_opendir(const char *pathname){
         return NULL;
     }
     
-    // parsePath uses strtok_r which modifies the input string, so we need
-    // to create a modifiable copy. This prevents corrupting the original
-    // pathname that the caller provided.
-    char *pathCopy = (char *)malloc(strlen(pathname) + 1);
-    if (pathCopy == NULL) {
-        return NULL;
-    }
-    strcpy(pathCopy, pathname);
-    
     // Parse the pathname to break it down into components and find the
     // target directory entry. The parsePathInfo structure will contain
     // information about where the directory is located.
     parsePathInfo ppi;
-    int parseResult = parsePath(pathCopy, &ppi);
-    free(pathCopy); // Clean up our temporary copy
+    int parseResult = parsePath(pathname, &ppi);
     if (parseResult != 0) {
         return NULL; // Path doesn't exist or is invalid
     }
@@ -458,8 +448,10 @@ int fs_setcwd(char *pathname){
     if (!pathname || strlen(pathname) == 0) return 0;
     DE *child = NULL;
     parsePathInfo ppi;
-    if (parsePath(pathname, &ppi) != 0)
-    printf("Error in fs_setcwd: Invalid path\n");
+    if (parsePath(pathname, &ppi) != 0) {
+        printf("Error in fs_setcwd: Invalid path\n");
+        return -1;
+    }
     int index = findInDirectory(ppi.parent, ppi.lastElementName);
     if (!ppi.lastElementName){
         //path already points to cwd
@@ -503,11 +495,10 @@ int fs_isFile(char * filename){
 // Joe
 // Returns 1 if directory, 0 otherwisepathname
 int fs_isDir(char * pathname){
-    char *pathCopy = strdup(pathname);
-    //printf("Pathname in isDir():%s\n", pathCopy);
     if (!pathname || strlen(pathname) == 0) return 0;
+
     parsePathInfo ppi;
-    if (parsePath(pathCopy, &ppi) != 0){
+    if (parsePath(pathname, &ppi) != 0){
         printf("Error in fs_isDir: Invalid path : %s \n", pathname);
         return -1;
     }    
@@ -521,7 +512,7 @@ int fs_stat(const char *path, struct fs_stat *buf){
     }
 
     parsePathInfo ppi;
-    int parseResult = parsePath((char *)path, &ppi);
+    int parseResult = parsePath(path, &ppi);
     if(parseResult != 0){
         return -2; // Path parsing error
     }
@@ -545,18 +536,25 @@ int fs_stat(const char *path, struct fs_stat *buf){
 
 // Ian / Joe
 // Returns 0 for valid path, any non-zero number reflects a specific error.
-int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
+int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
     // is this a relative or absolute path?
     //printf("In parsePath() pathname is :%s\n", pathName);
+
+    // copy pathName so that the caller does not have to worry
+    // about their pathname being altered
+    char * pathCopy = (char *)malloc(strlen(pathName) + 1);
+    if (pathCopy == NULL) {
+        return -1;
+    }
+    strcpy(pathCopy, pathName);
+
     DE * startParent;
     DE * parent;
     char * saveptr;
     char * token1;
     char * token2;
-
-    if (pathName == NULL)
-        return -1;
-    if (pathName[0] == '/') { // absolute path
+        
+    if (pathCopy[0] == '/') { // absolute path
         startParent = alreadyLoadedRootDir;
     }
     else {
@@ -564,15 +562,17 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
     }
     parent = startParent;
 
-    token1 = strtok_r(pathName, "/", &saveptr);
+    token1 = strtok_r(pathCopy, "/", &saveptr);
     if (token1 == NULL) {
         if (parent == alreadyLoadedRootDir) { // i.e. path[0]='/'
             ppi->parent = parent;
             ppi->lastElementName = NULL;
             ppi->index = -2;
+            free(pathCopy);
             return 0;
         }
         else {
+            free(pathCopy);
             return -1;
         }
     }
@@ -586,28 +586,37 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
         token2 = strtok_r(NULL, "/", &saveptr);
         if (token2 == NULL) { // we are done, token 1 is last element
             ppi->parent = parent;
-            ppi->lastElementName = token1; // may need to do a strdup here depending
+            // AFTER PARSEPATH REFACTOR: implimented the strdup the professor mentioned
+            // might be needed depending on our implimentation!!
+            ppi->lastElementName = strdup(token1);
             ppi->index = idx;
+            free(pathCopy);
             return 0;
         }
         if (strcmp(token1, "..") == 0){
             if (parent[0].blockNumber != parent[1].blockNumber){
                 DE * goBack = loadDirectory(&parent[1]);
-                if (!goBack) return -4;
+                if (!goBack) {
+                    free(pathCopy);
+                    return -4;
+                }
                 if (parent != startParent) free(parent);
                 parent = goBack;
             }
         }
         if (idx == -1) {
+            free(pathCopy);
             return -2; // invalid path
         } 
 
         if (!parent[idx].isDir) {
+            free(pathCopy);
             return -3; // invalid path (can't be file in middle)
         } 
         DE *tempParent = loadDirectory(&parent[idx]);
 
         if (tempParent == NULL) {
+            free(pathCopy);
             return -4; // failed to load dir
         }
 
@@ -621,17 +630,12 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
 // Ian / Joe
 int fs_mkdir(const char *pathname, mode_t mode) {
     printf("DEBUG: fs_mkdir called with path: %s\n", pathname);
-    
-    // working copy of string
-    char * pathCopy = strdup(pathname);
-    printf("DEBUG: pathCopy created: %s\n", pathCopy);
 
     // get ppi
     parsePathInfo ppi;
     printf("DEBUG: Calling parsePath...\n");
-    if (parsePath(pathCopy, &ppi) != 0) {
+    if (parsePath(pathname, &ppi) != 0) {
         printf("DEBUG: parsePath failed!\n");
-        free(pathCopy);
         return -1;
     }
     printf("DEBUG: parsePath succeeded. parent=%p, lastElementName=%s, index=%d\n", 
@@ -642,7 +646,6 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     struct VCB * vcb = getVCB();
     if (!vcb) {
         printf("DEBUG: getVCB returned NULL!\n");
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
         }
@@ -656,7 +659,6 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     DE * newDir = createDir(childLBA, parentLBA, 2, ppi.parent, vcb->blockSize);
     if (!newDir) {
         printf("DEBUG: createDir failed!\n");
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
         }
@@ -684,7 +686,6 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     if (freeIndex == -1) {
         printf("DEBUG: No free index found in parent!\n");
         free(newDir);
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
         }
@@ -722,7 +723,6 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     
     printf("DEBUG: Cleaning up memory...\n");
     free(newDir);
-    free(pathCopy);
 
     if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
         free(ppi.parent);
@@ -735,16 +735,11 @@ int fs_mkdir(const char *pathname, mode_t mode) {
 int fs_rmdir(const char *pathname) {
     printf("DEBUG: fs_rmdir called with path: %s\n", pathname);
     
-    // working copy of string
-    char * pathCopy = strdup(pathname);
-    printf("DEBUG: (rm_dir) pathCopy created: %s\n", pathCopy);
-
     // get ppi
     parsePathInfo ppi;
     printf("DEBUG: (rmdir) Calling parsePath...\n");
-    if (parsePath(pathCopy, &ppi) != 0) {
+    if (parsePath(pathname, &ppi) != 0) {
         printf("DEBUG: parsePath failed!\n");
-        free(pathCopy);
         return -1;
     }
     printf("DEBUG: (rmdir) parsePath succeeded. parent=%p, lastElementName=%s, index=%d\n", 
@@ -754,7 +749,6 @@ int fs_rmdir(const char *pathname) {
     if (!ppi.parent[ppi.index].isDir) {
         printf("DEBUG: %s is not a directory!\n", ppi.lastElementName);
 
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
         }
@@ -768,7 +762,6 @@ int fs_rmdir(const char *pathname) {
     if (!dirToDelete) {
         printf("DEBUG: rmdir Failed to load!!\n");
 
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
         }
@@ -785,7 +778,6 @@ int fs_rmdir(const char *pathname) {
             printf("DEBUG: Directory not empty, contains %s at index %d\n",dirToDelete[i].name, i);
             
             free(dirToDelete);
-            free(pathCopy);
             if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
                 free(ppi.parent);
             }
@@ -798,7 +790,6 @@ int fs_rmdir(const char *pathname) {
     struct VCB * vcb = getVCB();
     if (!vcb) {
         printf("DEBUG: getVCB returned NULL!\n");
-        free(pathCopy);
         if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
             free(ppi.parent);
             free(dirToDelete);
@@ -824,7 +815,6 @@ int fs_rmdir(const char *pathname) {
     
     printf("DEBUG: Cleaning up memory...\n");
     free(dirToDelete);
-    free(pathCopy);
 
     if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
         free(ppi.parent);

@@ -105,7 +105,7 @@ int findInDirectory(DE * directory, char * token);
 DE *loadDirectory(const DE *dirEntry);
 int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock);
 // Ian
-int parsePath(char * pathName, parsePathInfo *ppi);
+int parsePath(const char * pathName, parsePathInfo *ppi);
 
 // This is the strucutre that is filled in from a call to fs_stat
 struct fs_stat
