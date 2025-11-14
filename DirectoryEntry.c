@@ -226,3 +226,42 @@
 
         return dir;
     }
+
+    DE* Touch(int childLBA, DE * parent, char * name) {
+        if (!name){
+        printf("Bad call of touch passed null name\n");
+        return NULL;
+        }
+        int numEntries = parent[0].numBytes / sizeof(DE);
+        if (numEntries <= 2){
+            printf("Touch: Not enough entries found.\n");
+            return NULL;
+        }
+        int freeIndex = -1;
+        printf("DEBUG: Parent has %d entries\n", numEntries);
+        for (int i = 2; i < numEntries; i++) {
+            if (parent[i].name[0] == '\0') {
+            freeIndex = i;
+            printf("DEBUG: Found free index at %d\n", i);
+            break;
+            }
+        }
+        if (freeIndex == -1){
+            printf("DEBUG: No free entry slots in directory\n");
+            return NULL;
+        }
+        time_t now = time(NULL);
+        DE * newEntry = &parent[freeIndex];
+        memset(newEntry, 0, sizeof(DE));
+        strcpy(newEntry->name, name);
+        newEntry->isDir = 0;
+        newEntry->numBytes = 0;
+        newEntry->blockNumber = childLBA;
+        newEntry->accessDate = now;
+        newEntry->createDate = now;
+        newEntry->modifyDate = now;
+        parent[0].modifyDate = now;
+        return parent;
+        // MAKE SURE WHENEVER THIS IS CALLED TO THEN RIGHT TO DISK
+        // SO THAT CHANGES PERSIST ON DISK
+     }

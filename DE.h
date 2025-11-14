@@ -54,5 +54,7 @@ void writeDirToDiskDiscontiguous(const DE *dir, int blockSize, LinkedList* block
 DE* readDirFromDiskDiscontiguous(LinkedList* blockList, int blockSize);
 //Create directory that can span multiple non-contiguous blocks
 DE* createDirDiscontiguous(int minEntries, DE *parent, int blockSize);
+// Joe & Ian
+DE* Touch(int childLBA, DE * parent, char * name);
 
 #endif
