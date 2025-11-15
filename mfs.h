@@ -80,7 +80,6 @@ int fs_setcwd(char *pathname);   //linux chdir
 // Joe
 int fs_isFile(char * filename);	//return 1 if file, 0 otherwise
 int fs_isDir(char * pathname);		//return 1 if directory, 0 otherwise
-char *trimString(char *pathname);
 
 // Enrique
 int fs_delete(char* filename);	//removes a file

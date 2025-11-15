@@ -18,6 +18,7 @@
 #include "fsLow.h"
 #include "vector.h"
 #include "FSM.h"
+#include "fileinfo.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -826,4 +827,24 @@ int fs_rmdir(const char *pathname) {
 // Ian
 int fs_delete(char* filename) {
     return 0;
+}
+
+fileInfo * GetFileInfo (const char * filename){
+    if (!filename)
+        return NULL; //Bad call
+    parsePathInfo ppi;
+    if (parsePath(filename, &ppi) != 0)
+        return NULL; //Invalid path
+    if (ppi.index < 0)
+        return NULL;
+    DE *Entry = &ppi.parent[ppi.index];
+    if (Entry->isDir=1)
+        return NULL; //File name is directory invalid call
+    fileInfo *fi = malloc(sizeof(fileInfo));
+    if (!fi)
+        return NULL; //malloc failure
+    strcpy(fi->fileName, Entry->name);
+    fi->fileSize = Entry->numBytes;
+    fi->location = Entry->blockNumber;
+    return fi;
 }
