@@ -125,7 +125,7 @@ DE *loadDirectory(const DE *dirEntry){
 // directory for iteration by loading it into memory or using a cached
 // version and creating a directory descriptor fdDirthat tracks our
 // position as we read through entries.
-fdDir * fs_opendir(const char *pathname){
+fdDir * fs_opendir(char *pathname){
     // We need to check for NULL before calling strlen, which would crash
     // if pathname is NULL. parsePath also checks for NULL, but we need
     // to validate here first since we use strlen before calling parsePath.
@@ -503,7 +503,7 @@ int fs_isDir(char * pathname){
 }
 
 // James
-int fs_stat(const char *path, struct fs_stat *buf){
+int fs_stat(char *path, struct fs_stat *buf){
     if(path == NULL || buf == NULL){
         return -1; // Invalid arguments
     }
@@ -533,7 +533,7 @@ int fs_stat(const char *path, struct fs_stat *buf){
 
 // Ian / Joe
 // Returns 0 for valid path, any non-zero number reflects a specific error.
-int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
+int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will write to
     // is this a relative or absolute path?
     //printf("In parsePath() pathname is :%s\n", pathName);
 
@@ -544,7 +544,7 @@ int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer w
         return -1;
     }
     strcpy(pathCopy, pathName);
-
+    printf("Pathname in parsepath is :%s\n", pathCopy);
     DE * startParent;
     DE * parent;
     char * saveptr;
@@ -573,9 +573,6 @@ int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer w
             return -1;
         }
     }
-    if (strcmp(token1, ".") == 0){
-        token2 = strtok_r(NULL,"/",&saveptr);
-    }
 
     while (1)
     {
@@ -589,17 +586,6 @@ int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer w
             ppi->index = idx;
             free(pathCopy);
             return 0;
-        }
-        if (strcmp(token1, "..") == 0){
-            if (parent[0].blockNumber != parent[1].blockNumber){
-                DE * goBack = loadDirectory(&parent[1]);
-                if (!goBack) {
-                    free(pathCopy);
-                    return -4;
-                }
-                if (parent != startParent) free(parent);
-                parent = goBack;
-            }
         }
         if (idx == -1) {
             free(pathCopy);
@@ -624,8 +610,9 @@ int parsePath(const char * pathName, parsePathInfo * ppi) { // ppi is a buffer w
         token1 = token2;
     }
 }
+
 // Ian / Joe
-int fs_mkdir(const char *pathname, mode_t mode) {
+int fs_mkdir(char *pathname, mode_t mode) {
     printf("DEBUG: fs_mkdir called with path: %s\n", pathname);
 
     // get ppi
@@ -729,7 +716,7 @@ int fs_mkdir(const char *pathname, mode_t mode) {
     return 0;
 }
 // Ian
-int fs_rmdir(const char *pathname) {
+int fs_rmdir(char *pathname) {
     printf("DEBUG: fs_rmdir called with path: %s\n", pathname);
     
     // get ppi

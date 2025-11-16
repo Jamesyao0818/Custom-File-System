@@ -66,11 +66,11 @@ typedef struct fdDir
 	} fdDir;
 
 // Key directory functions
-int fs_mkdir(const char *pathname, mode_t mode);
-int fs_rmdir(const char *pathname);
+int fs_mkdir(char *pathname, mode_t mode);
+int fs_rmdir(char *pathname);
 
 // Directory iteration functions
-fdDir * fs_opendir(const char *pathname);
+fdDir * fs_opendir(char *pathname);
 struct fs_diriteminfo *fs_readdir(fdDir *dirp);
 int fs_closedir(fdDir *dirp);
 
@@ -104,7 +104,7 @@ int findInDirectory(DE * directory, char * token);
 DE *loadDirectory(const DE *dirEntry);
 int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock);
 // Ian
-int parsePath(const char * pathName, parsePathInfo *ppi);
+int parsePath(char * pathName, parsePathInfo *ppi);
 
 // This is the strucutre that is filled in from a call to fs_stat
 struct fs_stat
@@ -120,7 +120,7 @@ struct fs_stat
 	};
 
 
-int fs_stat(const char *path, struct fs_stat *buf);
+int fs_stat(char *path, struct fs_stat *buf);
 int Touch(DE * parent, char * name);
 
 #endif
