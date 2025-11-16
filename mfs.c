@@ -170,7 +170,7 @@ fdDir * fs_opendir(const char *pathname){
         // A valid index means we found a directory entry inside a parent
         // directory. We need to get a pointer to that entry.
         DE *dirEntry = &ppi.parent[ppi.index];
-        int isDEaDir();
+        //int isDEaDir();
         // Safety check: make sure this entry is actually a directory and
         // not a regular file. You can't iterate through a file!
         if (dirEntry->isDir != 1) {
@@ -400,8 +400,9 @@ char * fs_getcwd(char *pathname, size_t size){
             break;
         }
         // Free current only if it wasn't dynamically loaded.
-        if (cwd != alreadyLoadedCWD && cwd != alreadyLoadedRootDir){
-            free(cwd);
+        // With this:
+        if (currentDir != alreadyLoadedCWD && currentDir != alreadyLoadedRootDir){
+            free(currentDir);
         }
         currentDir = parent;
     } 
@@ -483,14 +484,9 @@ int fs_isFile(char * filename){
     if (!filename || strlen(filename) == 0) return -2;
     printf("File name in isFile():%s\n", filename);
     DE *cwd = alreadyLoadedCWD;
-    int numEntries = cwd[0].numBytes / sizeof(DE);
-    for (int i = 2; i < numEntries; i++){
-        //Matching name
-        if(strcmp(cwd[i].name, filename) == 0){
-            if (cwd[i].isDir != 1)
-                return 0;
-        }
-    }
+    int index = findInDirectory(cwd, filename);
+    if (cwd[index].isDir == 1)
+        return 0;
     return 1;
 }
 // Joe
@@ -503,7 +499,7 @@ int fs_isDir(char * pathname){
         printf("Error in fs_isDir: Invalid path : %s \n", pathname);
         return -1;
     }    
-    return ppi.parent->isDir;
+    return ppi.parent[ppi.index].isDir;
 }
 
 // James
@@ -824,27 +820,106 @@ int fs_rmdir(const char *pathname) {
     printf("DEBUG: fs_rmdir completed successfully!\n");
     return 0;
 }
-// Ian
+
+// Ian & Joe
 int fs_delete(char* filename) {
+    if (!filename)
+        return -1; //Bad call
+    DE * cwd = alreadyLoadedCWD;
+    // Files does not exist
+    int index = findInDirectory(cwd, filename);
+    if (index < 0)
+        return -2; // File not found
+    if (cwd[index].isDir != 0)
+        return -3; // Called on directory
+    DE * fileFileToRemove = &cwd[index];
+    fsmReleaseLBA(cwd[index].blockNumber);
+    struct VCB *v = getVCB;
+    memset(fileFileToRemove, 0, sizeof(DE));
     return 0;
 }
+    // Joe + Ian
+    // Returns block of new file on success else returns -1 for bad call. -2 insufficient entries, -3 no free entries, -4 LBAwrite failure.
+    int Touch(DE * parent, char * name) {
+        if (!name){
+        printf("Bad call of touch passed null name\n");
+        return -1;
+        }
+        struct VCB * v = getVCB();
+        // call allocate to reflect this new file in fsm
+        int freeBlock = allocate(v->blockSize);
+        if (freeBlock < 0) {
+            return freeBlock;
+        }
+        
+        int numEntries = parent[0].numBytes / sizeof(DE);
+        if (numEntries <= 2){
+            printf("Touch: Not enough entries found.\n");
+            return -2; // Error not enough entries.
+        }
+        int freeIndex = -1;
+        printf("DEBUG: Parent has %d entries\n", numEntries);
+        for (int i = 2; i < numEntries; i++) {
+            if (parent[i].name[0] == '\0') {
+            freeIndex = i;
+            printf("DEBUG: Found free index at %d\n", i);
+            break;
+            }
+        }
+        if (freeIndex == -1){
+            printf("DEBUG: No free entry slots in directory\n");
+            return -3; // Error no free entries.
+        }
+        time_t now = time(NULL);
+        DE * newEntry = &parent[freeIndex];
+        memset(newEntry, 0, sizeof(DE));
+        strcpy(newEntry->name, name);
+        newEntry->isDir = 0;
+        newEntry->numBytes = 0;
+        newEntry->blockNumber = freeBlock;
+        newEntry->accessDate = now;
+        newEntry->createDate = now;
+        newEntry->modifyDate = now;
+        parent[0].modifyDate = now;
 
-fileInfo * GetFileInfo (const char * filename){
+        if(!LBAwrite(parent, 1, parent[0].blockNumber)) {
+            printf("DEBUG: (touch) Failed to LBAwrite to update parent!");
+            return -4; // LBA write failure
+        }
+
+        printf("DEBUG: touch success! made empty file %s at block %d\n", name, freeBlock);
+        return freeBlock;
+     }
+
+fileInfo * getFileInfo (char * filename){
     if (!filename)
         return NULL; //Bad call
     parsePathInfo ppi;
-    if (parsePath(filename, &ppi) != 0)
-        return NULL; //Invalid path
-    if (ppi.index < 0)
-        return NULL;
-    DE *Entry = &ppi.parent[ppi.index];
-    if (Entry->isDir=1)
-        return NULL; //File name is directory invalid call
+    // File name exists and is found path.
+    if (parsePath(filename, &ppi) == 0 && ppi.index > 0){
+        DE *Entry = &ppi.parent[ppi.index];
+        printf("In getFileInfo() Entry populated with isDir value of :%d \n", Entry->isDir);
+        if (Entry->isDir==1)
+            return NULL; //File name is directory invalid call
+        fileInfo *fi = malloc(sizeof(fileInfo));
+        if (!fi){
+            printf("In getFileInfo() malloc failure \n");
+            free(fi);
+            fi = NULL;
+            return NULL;
+        }
+        strcpy(fi->fileName, Entry->name);
+        fi->fileSize = Entry->numBytes;
+        fi->location = Entry->blockNumber;
+        return fi;
+    }
     fileInfo *fi = malloc(sizeof(fileInfo));
-    if (!fi)
-        return NULL; //malloc failure
-    strcpy(fi->fileName, Entry->name);
-    fi->fileSize = Entry->numBytes;
-    fi->location = Entry->blockNumber;
+    DE * cwd = alreadyLoadedCWD;
+    // Files does not exist
+    int location = Touch(cwd, filename);
+    int index = findInDirectory(cwd, filename);
+    strcpy(fi->fileName,filename);
+    fi->fileSize = 0;
+    fi->location = location;
     return fi;
 }

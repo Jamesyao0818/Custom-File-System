@@ -77,6 +77,7 @@ u_int64_t allocate(int blockSize) {
     for (int i = 0; i < totalBits; i++) {
         if(getBit(i) == 0) {
             setBit(i);
+            fsmWrite();
             return i;
         }
     }
@@ -96,6 +97,7 @@ int loadFSM (int blockSize, unsigned int startBlock){
     if (fsm) { 
         free(fsm);
         fsm = NULL;
+        return -1;
     }
     fsm = (char*)malloc(numBytes);
     if (!fsm) return -1;
@@ -106,14 +108,6 @@ int loadFSM (int blockSize, unsigned int startBlock){
         return -1;
     }
     return 0;
-}
-
-// keep Ian's work for sure and create releaseBlock and allocate functions
-// Frees the given block number
-void releaseBlock(int blocknum) {
-    if (blocknum < 0) return;
-    clearBit(blocknum);
-    fsmWrite();
 }
 
 int fsmReserveLBA(int lba){ 

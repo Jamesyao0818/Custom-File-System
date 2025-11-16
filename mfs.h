@@ -121,6 +121,7 @@ struct fs_stat
 
 
 int fs_stat(const char *path, struct fs_stat *buf);
+int Touch(DE * parent, char * name);
 
 #endif
 

@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include "b_io.h"
 #include "fileinfo.h"
+#include "fsLow.h"
 
 #define MAXFCBS 20
 #define BLOCK_SIZE 512
@@ -77,41 +78,44 @@ b_io_fd b_getFCB ()
 // O_RDONLY, O_WRONLY, or O_RDWR
 b_io_fd b_open (char * filename, int flags)
 	{
-	b_io_fd returnFd;
-	//*** TODO ***:  Modify to save or set any information needed and AND SUPPORT OF FLAGS
-	//printf("in open\n");
 	if (startup == 0) 
 		b_init();  //Initialize our system
 	if (!filename) 
 		return -1; //invalid filename
+	b_io_fd fcbIndex = b_getFCB();
+	//*** TODO ***:  Modify to save or set any information needed and AND SUPPORT OF FLAGS
+	//printf("in open\n");
+
 	// Get the file information from the low level system
-	fileInfo *fi = GetFileInfo(filename);
+	fileInfo *fi = getFileInfo(filename);
 	if (!fi){
 		free(fi);
+		printf("In b_open : getFileInfo failed \n");
 		return -1; //malloc failure
 		// malloc failure
 	}
 	// if (!fi) return -1; //file not found
-	if (returnFd == -1) return -1; //no free file control blocks
+	if (fcbIndex == -1) return -1; //no free file control blocks
 	//*** TODO ***///  Write open function to return your file descriptor
 	//				  You may want to allocate the buffer here as well
 	//				  But make sure every file has its own buffer
-	fcbArray[returnFd].buf = malloc(BLOCK_SIZE);
-	if (fcbArray[returnFd].buf == NULL){
+	fcbArray[fcbIndex].buf = malloc(BLOCK_SIZE);
+	if (fcbArray[fcbIndex].buf == NULL){
 		free(fi);
-		fcbArray[returnFd].fi = NULL; // free the FCB
+		fcbArray[fcbIndex].fi = NULL; // free the FCB
 		return -1;	// memory allocation failed
 	}
-	fcbArray[returnFd].fi = fi;
-	fcbArray[returnFd].currentFilePosition = 0;
-	fcbArray[returnFd].bufferStartPosition = 0;
-	fcbArray[returnFd].numValidBufferBytes = 0;
-	//printf("Ending open with returnFd: %d \n", returnFd);
+	fcbArray[fcbIndex].fi = fi;
+	fcbArray[fcbIndex].currentFilePosition = 0;
+	fcbArray[fcbIndex].bufferStartPosition = 0;
+	fcbArray[fcbIndex].numValidBufferBytes = 0;
+	//printf("Ending open with fcbIndex: %d \n", fcbIndex);
 	//TO DO'S SUPPORT FLAGS AND ALL THAT HERE
 
-	returnFd = b_getFCB();				// get our own file descriptor
+			// get our own file descriptor
 	// check for error - all used FCB's
-	return (returnFd);						// all set*/
+	printf("In b_open free fcb index found at : %d\n", fcbIndex);
+	return fcbIndex;						// all set*/
 }
 
 
@@ -169,21 +173,98 @@ int b_write (b_io_fd fd, char * buffer, int count)
 //  | Part1       |  Part 2                                        | Part3  |
 //  +-------------+------------------------------------------------+--------+
 int b_read (b_io_fd fd, char * buffer, int count)
-	{
+    {
+    // TODO //
+    // Write buffered read function to return the data and # bytes read
+    // You must use LBAread and you must buffer the data in BLOCK_SIZE byte chunks.
 
-	if (startup == 0) b_init();  //Initialize our system
+    if (startup == 0) b_init();  //Initialize our system
 
-	// check that fd is between 0 and (MAXFCBS-1)
-	if ((fd < 0) || (fd >= MAXFCBS))
-		{
-		return (-1); 					//invalid file descriptor
+    // check that fd is between 0 and (MAXFCBS-1)
+    if ((fd < 0) || (fd >= MAXFCBS))
+        {
+        return (-1);                     //invalid file descriptor
+        }
+
+    // and check that the specified FCB is actually in use
+    if (fcbArray[fd].fi == NULL)        //File not open for this descriptor
+        {
+        return -1;
+        }
+
+
+    b_fcb * fcb = &fcbArray[fd]; // Get the current fcb
+
+    int bytesRead = 0; // Keep track of bytes read per user call to ensure
+                       // no more bytes than the user wants (count) are put into user buffer
+	// Main read loop
+    while (bytesRead < count && fcb->currentFilePosition < fcb->fi->fileSize) {
+        // Skip reading a block if the current position is already within the buffer,
+        // the data is already immediatly accessable! So only perform the read
+        // when current position is OUTSIDE the bounds of our buffer.
+        if (fcb->currentFilePosition < fcb->bufferStartPosition ||
+            fcb->currentFilePosition >= fcb->bufferStartPosition + fcb->numValidBufferBytes) {
+
+            int blockNumber = fcb->currentFilePosition / BLOCK_SIZE;
+
+            // Read 1 block
+            LBAread(fcb->buf, 1, fcb->fi->location + blockNumber);
+
+            // Update buffer position to reflect the read
+            fcb->bufferStartPosition = blockNumber * BLOCK_SIZE;
+            fcb->numValidBufferBytes = BLOCK_SIZE;
+            // If the read has gone past EOF, reduce valid buffer bytes
+            if (fcb->bufferStartPosition + BLOCK_SIZE > fcb->fi->fileSize) {
+                fcb->numValidBufferBytes = fcb->fi->fileSize - fcb->bufferStartPosition;
+            }
+        }
+
+        // numValidBufferBytes 512 or less if EOF. From this total valid amount,
+        // Only copy starting from the current position, therefore subtract
+        // from it the difference between current position and buffer start
+        int bytesToCopy = (fcb->numValidBufferBytes - 
+            (fcb->currentFilePosition - fcb->bufferStartPosition));
+        // If this^^ amount of bytes is greater than the amount of bytes
+        // the user asked for, do not use that amount because it will
+        // copy unwanted bytes into the users buffer.
+        if ((count - bytesRead) < bytesToCopy) {
+            bytesToCopy = (count - bytesRead);
 		}
-		
-	return (0);	//Change this
-	}
+        // Now with the appropriate number of bytes to copy, perform the copy
+        // from our buffer into the users buffer
+        memcpy(buffer, fcb->buf + (fcb->currentFilePosition - fcb->bufferStartPosition), 
+                bytesToCopy);
+
+        // Update trackers for the next loop
+        bytesRead += bytesToCopy;
+        fcb->currentFilePosition += bytesToCopy;
+    }
+    return bytesRead;
+    // Your Read code here - the only function you call to get data is LBAread.
+    // Track which byte in the buffer you are at, and which block in the file
+    }
+
 	
 // Interface to Close the file	
 int b_close (b_io_fd fd)
 	{
+	//printf("In close\n");
+	//*** TODO ***//  Release any resources
+	if ((fd < 0) || (fd >= MAXFCBS)) return -1;
+    if (fcbArray[fd].fi == NULL) return -1;
 
+    // free per-file buffer
+    if (fcbArray[fd].buf)
+        {
+        free(fcbArray[fd].buf);
+        fcbArray[fd].buf = NULL;
+        }
+
+    // reset FCB so it can be reused
+    fcbArray[fd].fi = NULL;
+	fcbArray[fd].currentFilePosition = 0;
+	fcbArray[fd].bufferStartPosition = 0;
+	fcbArray[fd].numValidBufferBytes = 0;
+	//printf("Ending close\n");
+    return 0;
 	}
