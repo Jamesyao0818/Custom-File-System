@@ -31,9 +31,10 @@ typedef struct b_fcb
     fileInfo * fi;    		 //holds the low level systems file info
     // Add any other needed variables here to track the individual open file
     char * buf;
-    int currentFilePosition; //index //curent position of the buffer
-    int bufferStartPosition; // start position
+    int currentFilePosition; // logical position like a pointer i.e. current byte offset
+    int bufferStartPosition; // basically buffer[0]
     int numValidBufferBytes; // Holds how many valid bytes are in the buffer
+	int flags;				 // Holds the flags used on that file.
 } b_fcb;
 
 b_fcb fcbArray[MAXFCBS];
@@ -85,11 +86,13 @@ b_io_fd b_open (char * filename, int flags)
 	b_io_fd fcbIndex = b_getFCB();
 	//*** TODO ***:  Modify to save or set any information needed and AND SUPPORT OF FLAGS
 	//printf("in open\n");
-
+	if (fcbIndex == -1){
+		printf("In b_open: No free fcb index found.\n");
+		return -1;
+	}
 	// Get the file information from the low level system
-	fileInfo *fi = getFileInfo(filename);
+	fileInfo *fi = getFileInfo(filename, flags);
 	if (!fi){
-		free(fi);
 		printf("In b_open : getFileInfo failed \n");
 		return -1; //malloc failure
 		// malloc failure
@@ -109,6 +112,7 @@ b_io_fd b_open (char * filename, int flags)
 	fcbArray[fcbIndex].currentFilePosition = 0;
 	fcbArray[fcbIndex].bufferStartPosition = 0;
 	fcbArray[fcbIndex].numValidBufferBytes = 0;
+	fcbArray[fcbIndex].flags = flags;
 	//printf("Ending open with fcbIndex: %d \n", fcbIndex);
 	//TO DO'S SUPPORT FLAGS AND ALL THAT HERE
 

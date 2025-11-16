@@ -8,6 +8,6 @@ typedef struct fileInfo {
 	int location;			//starting lba (block number) for the file data
 } fileInfo;
 
-fileInfo * getFileInfo (char * filename);
+fileInfo * getFileInfo (char * filename, int flags);
 
 #endif

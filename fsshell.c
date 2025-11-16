@@ -95,7 +95,8 @@ int displayFiles (fdDir * dirp, int flall, int fllong)
 #if (CMDLS_ON == 1)				
 	if (dirp == NULL)	//get out if error
 		return (-1);
-	
+	printf("[displayFiles] listing directory whose first entry blockNumber is %d\n",
+    dirp->directory[0].blockNumber);
 	struct fs_diriteminfo * di;
 	struct fs_stat statbuf;
 	

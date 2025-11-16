@@ -544,7 +544,7 @@ int parsePath(char * pathName, parsePathInfo * ppi) { // ppi is a buffer we will
         return -1;
     }
     strcpy(pathCopy, pathName);
-    printf("Pathname in parsepath is :%s\n", pathCopy);
+    //printf("Pathname in parsepath is :%s\n", pathCopy);
     DE * startParent;
     DE * parent;
     char * saveptr;
@@ -878,12 +878,13 @@ int fs_delete(char* filename) {
         return freeBlock;
      }
 
-fileInfo * getFileInfo (char * filename){
+fileInfo * getFileInfo (char * filename, int flags){
     if (!filename)
         return NULL; //Bad call
     parsePathInfo ppi;
+    int ppResult = parsePath(filename, &ppi);
     // File name exists and is found path.
-    if (parsePath(filename, &ppi) == 0 && ppi.index > 0){
+    if (ppResult == 0 && ppi.index > 0){
         DE *Entry = &ppi.parent[ppi.index];
         printf("In getFileInfo() Entry populated with isDir value of :%d \n", Entry->isDir);
         if (Entry->isDir==1)
@@ -891,8 +892,6 @@ fileInfo * getFileInfo (char * filename){
         fileInfo *fi = malloc(sizeof(fileInfo));
         if (!fi){
             printf("In getFileInfo() malloc failure \n");
-            free(fi);
-            fi = NULL;
             return NULL;
         }
         strcpy(fi->fileName, Entry->name);
@@ -900,13 +899,34 @@ fileInfo * getFileInfo (char * filename){
         fi->location = Entry->blockNumber;
         return fi;
     }
-    fileInfo *fi = malloc(sizeof(fileInfo));
-    DE * cwd = alreadyLoadedCWD;
-    // Files does not exist
-    int location = Touch(cwd, filename);
-    int index = findInDirectory(cwd, filename);
-    strcpy(fi->fileName,filename);
-    fi->fileSize = 0;
-    fi->location = location;
-    return fi;
+    if (ppResult !=0 && (flags & O_CREAT)){
+        // File name does NOT exist and is flagged O_CREATE
+        DE * cwd = alreadyLoadedCWD;
+        if (!cwd){
+            printf("In getFileInfo(): CWD is NULL, cannout create file.\n");
+            return NULL;
+        }
+        // Files does not exist
+        int location = Touch(cwd, filename);
+        if (location < 0){
+            printf("In getFileInfo(): Touch failed with result %d.\n", location);
+            return NULL;
+        }
+        int index = findInDirectory(cwd, filename);
+        if (index < 0){
+            printf("In getFileInfo(): created file but could not find it in directory.\n");
+            return NULL;
+        }
+        fileInfo *fi = malloc(sizeof(fileInfo));
+        if (!fi){
+            printf("In getFileInfo() malloc failure \n");
+            return NULL;
+        }
+        strcpy(fi->fileName,filename);
+        fi->fileSize = 0;
+        fi->location = location;
+        return fi;
+    }
+    return NULL;
 }
+
