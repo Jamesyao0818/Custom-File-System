@@ -41,8 +41,8 @@
 #define CMDMV_ON	1
 #define CMDMD_ON	1
 #define CMDRM_ON	1
-#define CMDCP2L_ON	0
-#define CMDCP2FS_ON	0
+#define CMDCP2L_ON	1
+#define CMDCP2FS_ON	1
 #define CMDCD_ON	1
 #define CMDPWD_ON	1
 #define CMDTOUCH_ON	1
@@ -362,7 +362,14 @@ int cmd_cp (int argcnt, char *argvec[])
 int cmd_mv (int argcnt, char *argvec[])
 	{
 #if (CMDMV_ON == 1)				
-	return -99;
+	if (argcnt != 3)
+		return -1; //Improper call
+	char * sourceFilename = argvec[1];
+	char * destFilename = argvec[2];
+	char *cpVector[3] = {"cp", sourceFilename, destFilename};
+	char *rmVector[2] = {"rm" , sourceFilename};
+	cmd_cp(3, cpVector);
+	cmd_rm(2, rmVector);
 	// **** TODO ****  For you to implement	
 #endif
 	return 0;

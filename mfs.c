@@ -834,7 +834,7 @@ int fs_delete(char* filename) {
         return -3; // Called on directory
     DE * fileFileToRemove = &cwd[index];
     fsmReleaseLBA(cwd[index].blockNumber);
-    struct VCB *v = getVCB;
+    struct VCB *v = getVCB();
     memset(fileFileToRemove, 0, sizeof(DE));
     return 0;
 }
