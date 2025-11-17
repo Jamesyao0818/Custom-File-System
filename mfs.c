@@ -883,8 +883,10 @@ fileInfo * getFileInfo (char * filename, int flags){
         return NULL; //Bad call
     parsePathInfo ppi;
     int ppResult = parsePath(filename, &ppi);
+    if (ppResult != 0)
+        return NULL; // Invalid path
     // File name exists and is found path.
-    if (ppResult == 0 && ppi.index > 0){
+    if (ppi.index >= 0){
         DE *Entry = &ppi.parent[ppi.index];
         printf("In getFileInfo() Entry populated with isDir value of :%d \n", Entry->isDir);
         if (Entry->isDir==1)
@@ -899,7 +901,7 @@ fileInfo * getFileInfo (char * filename, int flags){
         fi->location = Entry->blockNumber;
         return fi;
     }
-    if (ppResult !=0 && (flags & O_CREAT)){
+    if ((flags & O_CREAT) != 0){
         // File name does NOT exist and is flagged O_CREATE
         DE * cwd = alreadyLoadedCWD;
         if (!cwd){
@@ -927,6 +929,25 @@ fileInfo * getFileInfo (char * filename, int flags){
         fi->location = location;
         return fi;
     }
+    // Non-existent file with lack of O_CREAT flag
     return NULL;
 }
 
+int updateFileSizeOnDisk(char *pathname, int newSize){
+    if (!pathname)
+        return -1;
+    parsePathInfo ppi;
+    int ppResult = parsePath(pathname, &ppi);
+    if (ppResult != 0){
+        printf("In updateFileSizeOnDisk: parsepath called with invalid path.\n");
+        return -2;
+    }    
+    if (ppi.index < 0){
+        printf("In updateFileSizeOnDisk: DE not found for:%s\n", pathname);
+        return -3;
+    }
+    ppi.parent[ppi.index].numBytes = newSize;
+    ppi.parent[ppi.index].modifyDate = time(NULL);
+    LBAwrite(ppi.parent, 1, ppi.parent[0].blockNumber);
+    return 0;
+}

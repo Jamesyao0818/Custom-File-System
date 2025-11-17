@@ -66,14 +66,6 @@ b_io_fd b_getFCB ()
 	return (-1);  //all in use
 	}
 
-// GetFileInfo takes a file name (as a C string) and returns a pointer to
-// a fileInfo structure that contains the name, file size in bytes and the 
-// starting block number for the file.  It returns NULL if it can not find
-// the specified file.
-// fileInfo * GetFileInf(char *filename);
-
-
-
 // Interface to open a buffered file
 // Modification of interface for this assignment, flags match the Linux flags for open
 // O_RDONLY, O_WRONLY, or O_RDWR
@@ -138,22 +130,95 @@ int b_seek (b_io_fd fd, off_t offset, int whence)
 	return (0); //Change this
 	}
 
-
-
 // Interface to write function	
 int b_write (b_io_fd fd, char * buffer, int count)
 	{
+	if (!buffer || count <= 0)
+		return -2; // Bad call
 	if (startup == 0) b_init();  //Initialize our system
-
+	// Step 1: Validate fd.
 	// check that fd is between 0 and (MAXFCBS-1)
 	if ((fd < 0) || (fd >= MAXFCBS))
 		{
 		return (-1); 					//invalid file descriptor
 		}
-		
-		
-	return (0); //Change this
+	// Step 2: Get pointer to the file's FCB entry;
+	b_fcb *fcb = &fcbArray[fd];
+	if (!fcb->fi)
+		return -3; // Bad file info
+	// Step 3: Check for Append flag.
+	// Move the buffer forward to end of file.
+	if (fcb->flags & O_APPEND)
+		fcb->currentFilePosition = fcb->fi->fileSize;	
+	// Step 4: Write Loop
+	// Write until we reach number (count) passed in.
+	size_t bytesWritten = 0;
+	while (bytesWritten < count){
+		// Step 5: Check to see if current file position
+		// is in the current buffer window.
+		// Our file pointer is behind the start of block			  // Is our file position ahead of buffer
+		// file starts at 700 ; buf[0] = byte 1024; WRONG FLUSH 	  // buf[0] = byte 0; file starts at 513; WRONG FLUSH
+		// In both this cases buffer does NOT contain byte we want to write so we mush flush.
+		int outsideWindow = (fcb->currentFilePosition < fcb->bufferStartPosition ||
+		fcb->currentFilePosition >= fcb->bufferStartPosition + BLOCK_SIZE);
+
+		if(outsideWindow && fcb->numValidBufferBytes > 0){
+			// Flush buffer
+			int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
+			int previousLocation = fcb->fi->location;
+			blockIndex +=  previousLocation;
+			LBAwrite(fcb->buf, 1, blockIndex);
+			fcb->numValidBufferBytes = 0;
+		}
+
+		if (outsideWindow && fcb->numValidBufferBytes == 0){
+			// Realign the buffer
+			fcb->bufferStartPosition = (fcb->currentFilePosition / BLOCK_SIZE) * BLOCK_SIZE;
+			
+			if (fcb->bufferStartPosition < fcb->fi->fileSize){
+				// There is existing data in this block so we need to read it.
+				int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
+				LBAread(fcb->buf, 1, fcb->fi->location + blockIndex);
+				int remainingFileBytes = fcb->fi->fileSize - fcb->bufferStartPosition;
+				fcb->numValidBufferBytes = (remainingFileBytes < BLOCK_SIZE) ? remainingFileBytes : BLOCK_SIZE;
+			} else {
+				// We're righting past EOF so we need to start with a 0'd block
+				memset(fcb->buf, 0, BLOCK_SIZE);
+				fcb->numValidBufferBytes = 0;
+			}
+		} 
+		// Step 6: Compute current offset.
+		size_t offset = fcb->currentFilePosition - fcb->bufferStartPosition;
+		int spaceInBlock = BLOCK_SIZE - offset;
+
+		// Step 7: Determine number of bytes we can copy into buffer before end of block.
+		int remaining = count - bytesWritten;
+		int bytesToCopy = (remaining < spaceInBlock) ? remaining : spaceInBlock;
+
+		// Step 8 : Update values
+		// Take the minimum of space in block if only one block is left.
+		// else use total amount of bytes left to copy
+		memcpy(fcb->buf + offset, buffer + bytesWritten, bytesToCopy);
+		fcb->currentFilePosition += bytesToCopy;
+		bytesWritten += bytesToCopy;
+		// Take the max of current valid bytes or offset + bytestocopy
+		fcb->numValidBufferBytes = fcb->numValidBufferBytes > offset + bytesToCopy ? fcb->numValidBufferBytes : offset + bytesToCopy;
+		// Step 9: Check for full buffer. If full flush
+		int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
+		if (fcb->numValidBufferBytes == BLOCK_SIZE || offset + bytesToCopy == BLOCK_SIZE){
+			int previousLocation = fcb->fi->location;
+			blockIndex += previousLocation;
+			LBAwrite(fcb->buf, 1, blockIndex);
+			fcb->numValidBufferBytes=0;
+		}
+		// Step 10: If writing past old file size
+		// Update fileInfo correctly
+		if (fcb->currentFilePosition > fcb->fi->fileSize){
+			fcb->fi->fileSize = fcb->currentFilePosition;
+		}
 	}
+	return bytesWritten;
+}
 
 
 
@@ -236,7 +301,7 @@ int b_read (b_io_fd fd, char * buffer, int count)
 		}
         // Now with the appropriate number of bytes to copy, perform the copy
         // from our buffer into the users buffer
-        memcpy(buffer, fcb->buf + (fcb->currentFilePosition - fcb->bufferStartPosition), 
+        memcpy(buffer + bytesRead, fcb->buf + (fcb->currentFilePosition - fcb->bufferStartPosition), 
                 bytesToCopy);
 
         // Update trackers for the next loop
@@ -257,18 +322,26 @@ int b_close (b_io_fd fd)
 	if ((fd < 0) || (fd >= MAXFCBS)) return -1;
     if (fcbArray[fd].fi == NULL) return -1;
 
+	// Flush partial block
+	if (fcbArray[fd].numValidBufferBytes > 0) {
+        int blockIndex = fcbArray[fd].bufferStartPosition / BLOCK_SIZE;
+        LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
+    }
+	
+	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, fcbArray[fd].fi->fileSize);
+
     // free per-file buffer
     if (fcbArray[fd].buf)
         {
         free(fcbArray[fd].buf);
         fcbArray[fd].buf = NULL;
         }
-
-    // reset FCB so it can be reused
+	// reset FCB so it can be reused
     fcbArray[fd].fi = NULL;
 	fcbArray[fd].currentFilePosition = 0;
 	fcbArray[fd].bufferStartPosition = 0;
 	fcbArray[fd].numValidBufferBytes = 0;
+	fcbArray[fd].flags = 0;
 	//printf("Ending close\n");
     return 0;
 	}

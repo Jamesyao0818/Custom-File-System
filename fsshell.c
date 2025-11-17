@@ -95,8 +95,8 @@ int displayFiles (fdDir * dirp, int flall, int fllong)
 #if (CMDLS_ON == 1)				
 	if (dirp == NULL)	//get out if error
 		return (-1);
-	printf("[displayFiles] listing directory whose first entry blockNumber is %d\n",
-    dirp->directory[0].blockNumber);
+	//printf("[displayFiles] listing directory whose first entry blockNumber is %d\n",
+    //dirp->directory[0].blockNumber);
 	struct fs_diriteminfo * di;
 	struct fs_stat statbuf;
 	
@@ -362,7 +362,8 @@ int cmd_cp (int argcnt, char *argvec[])
 ****************************************************/
 int cmd_mv (int argcnt, char *argvec[])
 	{
-#if (CMDMV_ON == 1)				
+#if (CMDMV_ON == 1)
+	// **** TODO ****  For you to implement					
 	if (argcnt != 3)
 		return -1; //Improper call
 	char * sourceFilename = argvec[1];
@@ -371,7 +372,7 @@ int cmd_mv (int argcnt, char *argvec[])
 	char *rmVector[2] = {"rm" , sourceFilename};
 	cmd_cp(3, cpVector);
 	cmd_rm(2, rmVector);
-	// **** TODO ****  For you to implement	
+
 #endif
 	return 0;
 	}
