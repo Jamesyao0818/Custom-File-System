@@ -89,6 +89,10 @@ b_io_fd b_open (char * filename, int flags)
 		return -1; //malloc failure
 		// malloc failure
 	}
+
+	// TODO 
+	// MAKE SURE ORDER OF FLAG ASSIGNMENT IS FIXED
+
 	// if (!fi) return -1; //file not found
 	if (fcbIndex == -1) return -1; //no free file control blocks
 	//*** TODO ***///  Write open function to return your file descriptor
@@ -114,7 +118,9 @@ b_io_fd b_open (char * filename, int flags)
 	return fcbIndex;						// all set*/
 }
 
-
+// TODO
+// FINISH THIS FUNCTION AND NEST IT IN OTHER FUNCTIONS
+// GIVEN PROPER FLAG CONDITIONS
 // Interface to seek function	
 int b_seek (b_io_fd fd, off_t offset, int whence)
 	{
@@ -133,6 +139,9 @@ int b_seek (b_io_fd fd, off_t offset, int whence)
 // Interface to write function	
 int b_write (b_io_fd fd, char * buffer, int count)
 	{
+	// TO DO 
+	// CHECK FOR PROPER FLAGS
+	// MAKE SURE SEEK IS PUT IF AND WHERE NECESSARY
 	if (!buffer || count <= 0)
 		return -2; // Bad call
 	if (startup == 0) b_init();  //Initialize our system
@@ -246,7 +255,15 @@ int b_read (b_io_fd fd, char * buffer, int count)
     // TODO //
     // Write buffered read function to return the data and # bytes read
     // You must use LBAread and you must buffer the data in BLOCK_SIZE byte chunks.
+	
+	
+	// TO DO 
+	// CHECK FOR PROPER FLAGS
+	// MAKE SURE SEEK IS PUT IF AND WHERE NECESSARY
 
+
+
+	
     if (startup == 0) b_init();  //Initialize our system
 
     // check that fd is between 0 and (MAXFCBS-1)
@@ -309,6 +326,7 @@ int b_read (b_io_fd fd, char * buffer, int count)
         fcb->currentFilePosition += bytesToCopy;
     }
     return bytesRead;
+	
     // Your Read code here - the only function you call to get data is LBAread.
     // Track which byte in the buffer you are at, and which block in the file
     }
