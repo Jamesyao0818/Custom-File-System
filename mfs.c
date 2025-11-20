@@ -167,6 +167,8 @@ fdDir * fs_opendir(char *pathname){
         dirToCopy = &tempDir;
     } else if (ppi.index >= 0 && ppi.parent[ppi.index].isDir == 1){
         dirToCopy = &ppi.parent[ppi.index];
+    } else {
+        return NULL;
     }
     DE *dirOnDisk = loadDirectory(dirToCopy);
     if (!dirOnDisk){
@@ -188,6 +190,7 @@ fdDir * fs_opendir(char *pathname){
     if (dirp == NULL) {
         // If allocation fails clean up the directory we loaded but only
         // if it's not cached since we shouldn't free cached directories
+        free(dirOnDisk);
         return NULL;
     }
     dirp->dirEntryPosition = 0;
@@ -787,6 +790,7 @@ int fs_delete(char* filename) {
     fsmReleaseLBA(cwd[index].blockNumber);
     struct VCB *v = getVCB();
     memset(fileFileToRemove, 0, sizeof(DE));
+    writeDirToDisk(cwd, v->blockSize);
     return 0;
 }
     // Joe + Ian
