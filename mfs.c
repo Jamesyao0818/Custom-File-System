@@ -143,8 +143,8 @@ fdDir * fs_opendir(char *pathname){
         return NULL; // Path doesn't exist or is invalid
     }
     
-    DE *targetDir = NULL;
-    int isCached = 0; // Track whether we're using a cached directory
+    DE tempDir;
+    DE *dirToCopy = NULL;
     
     // When index is -2, it means we're opening the parent directory itself
     // like opening "/" for root. This is how parsePath indicates that
@@ -159,57 +159,25 @@ fdDir * fs_opendir(char *pathname){
                    "initFileSystem must be called first.\n");
             return NULL;
         }
-        
-        // Use the already loaded directory (cached in initFileSystem)
-        targetDir = ppi.parent;
-        // Mark as cached if it matches our global cache pointers
-        if (targetDir == alreadyLoadedRootDir || 
-            targetDir == alreadyLoadedCWD) {
-            isCached = 1;
-        }
-    } else if (ppi.index >= 0) {
-        // A valid index means we found a directory entry inside a parent
-        // directory. We need to get a pointer to that entry.
-        DE *dirEntry = &ppi.parent[ppi.index];
-        //int isDEaDir();
-        // Safety check: make sure this entry is actually a directory and
-        // not a regular file. You can't iterate through a file!
-        if (dirEntry->isDir != 1) {
-            return NULL;
-        }
-        
-        // Before loading from disk, check if this directory is already
-        // cached as the current working directory. We compare block
-        // numbers because that's how we uniquely identify directories.
-        if (alreadyLoadedCWD != NULL && 
-            dirEntry->blockNumber == alreadyLoadedCWD->blockNumber) {
-            targetDir = alreadyLoadedCWD;
-            isCached = 1;
-        } else {
-            // Not cached, so load the directory from disk. This reads the
-            // directory's data blocks and returns a pointer to the array
-            // of directory entries.
-            targetDir = loadDirectory(dirEntry);
-            if (targetDir == NULL) {
-                return NULL;
-            }
-        }
-    } else {
-        // Index is -1 meaning the directory wasn't found in the parent
+        //Clean slate for copy
+        memset(&tempDir, 0 , sizeof(DE));
+        tempDir.blockNumber = ppi.parent[0].blockNumber;
+        tempDir.numBytes = ppi.parent[0].numBytes;
+        tempDir.isDir = ppi.parent[0].isDir;
+        dirToCopy = &tempDir;
+    } else if (ppi.index >= 0 && ppi.parent[ppi.index].isDir == 1){
+        dirToCopy = &ppi.parent[ppi.index];
+    }
+    DE *dirOnDisk = loadDirectory(dirToCopy);
+    if (!dirOnDisk){
         return NULL;
     }
-    
-    // Final validation: ensure we have a valid directory pointer and that
-    // it's actually marked as a directory not corrupted data
-    if (targetDir == NULL || targetDir->isDir != 1) {
-        return NULL;
-    }
-    
     // Calculate how many directory entries can fit in this directory.
     // The first entry index 0 stores the total size in numBytes, so
     // we divide by the size of one directory entry to get the count.
-    int totalEntries = targetDir[0].numBytes / sizeof(DE);
+    int totalEntries = dirOnDisk[0].numBytes / sizeof(DE);
     if (totalEntries <= 0) {
+        free(dirOnDisk);
         return NULL; // Invalid directory size
     }
     
@@ -220,23 +188,18 @@ fdDir * fs_opendir(char *pathname){
     if (dirp == NULL) {
         // If allocation fails clean up the directory we loaded but only
         // if it's not cached since we shouldn't free cached directories
-        if (!isCached && targetDir != alreadyLoadedRootDir && 
-            targetDir != alreadyLoadedCWD) {
-            free(targetDir);
-        }
         return NULL;
     }
-    
+    dirp->dirEntryPosition = 0;
+    dirp->directory = dirOnDisk;
+    dirp->d_reclen = sizeof(DE);
+    dirp->totalEntries = totalEntries;
+    dirp->di = NULL;
     // Initialize the directory descriptor. We start at position 0 the
     // first entry, point to our loaded directory, and set the record
     // length. The di pointer will be allocated when we first read an
     // entry (lazy allocation to save memory if the directory is never
     // actually read).
-    dirp->dirEntryPosition = 0;
-    dirp->directory = targetDir;
-    dirp->d_reclen = sizeof(DE);
-    dirp->totalEntries = totalEntries; // Store for efficiency in readdir
-    dirp->di = NULL;
     
     return dirp;
 }
@@ -432,7 +395,7 @@ char * fs_getcwd(char *pathname, size_t size){
         freeVector(&parts);
         return NULL; //Buffer too small
     }
-    // Now that we have correct return string and verified sufficien
+    // Now that we have correct return string and verified sufficient
     // Space and pathname length. We just memcpy to buffer (pathname).
     pathname[0] = '/';
     memcpy(pathname +1, returnString, returnLength + 1);
@@ -639,7 +602,7 @@ int fs_mkdir(char *pathname, mode_t mode) {
     printf("DEBUG: VCB obtained, blockSize=%d\n", vcb->blockSize);
     
     printf("DEBUG: Calling createDir...\n");
-    int childLBA = allocate(vcb->blockSize);
+    int childLBA = allocate(vcb->blockSize, vcb->blockSize);
     int parentLBA = ppi.parent[0].blockNumber;
     DE * newDir = createDir(childLBA, parentLBA, 2, ppi.parent, vcb->blockSize);
     if (!newDir) {
@@ -835,7 +798,7 @@ int fs_delete(char* filename) {
         }
         struct VCB * v = getVCB();
         // call allocate to reflect this new file in fsm
-        int freeBlock = allocate(v->blockSize);
+        int freeBlock = allocate(v->blockSize, v->blockSize);
         if (freeBlock < 0) {
             return freeBlock;
         }

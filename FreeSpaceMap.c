@@ -72,15 +72,38 @@ static int getBit(int bitToGet) {
 
 // Returns the bit position of the next free block, and marks it as used
 // Gets free block
-u_int64_t allocate(int blockSize) {
+u_int64_t allocate(int blockSize, int numBytes) {
     int totalBits = 5 * 8 * blockSize;
-    for (int i = 0; i < totalBits; i++) {
-        if(getBit(i) == 0) {
-            setBit(i);
+    if (numBytes <= blockSize) {
+        for (int i = 0; i < totalBits; i++) {
+            if (getBit(i) == 0) {
+                setBit(i);
+                fsmWrite();
+                return i;
+            }
+        }
+    }
+    int blocksNeeded = (numBytes + blockSize -1) / blockSize;
+
+    for (int i =0; i <= totalBits - blocksNeeded; i++) {
+        // find a region with enough contiguous unused blocks
+        int allFree = 1;
+        for (int j = 0; j < blocksNeeded; j++) {
+            if (getBit(i+j) != 0 || (i+j) >= totalBits) {
+                allFree = 0;
+                break;
+            }
+        }
+        // now that it is found, allocate each one
+        if (allFree) {
+            for (int j = 0; j < blocksNeeded; j++) {
+                setBit(i + j);
+            }
             fsmWrite();
             return i;
         }
     }
+
     return -1; // No free blocks left
 }
 

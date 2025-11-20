@@ -18,7 +18,7 @@
 
 //Function Declarations.
 void fsmWrite();
-u_int64_t allocate(int blockSize);
+u_int64_t allocate(int blockSize, int numBytes);
 int initFSM(int blockSize);
 static void setBit(int bitToSet);
 static void clearBit(int bitToClear);
