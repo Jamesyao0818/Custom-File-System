@@ -932,18 +932,26 @@ int ensureAllocation(fileInfo *fi, int oldSize, int newFileSize){
     int blockSize = vcb->blockSize;
     int oldBlocks = (oldSize + blockSize -1) / blockSize;
     int newBlocks = (newFileSize + blockSize -1 ) / blockSize;
+    if(oldBlocks == 0 && oldSize == 0 ){
+        oldBlocks = 1;
+    }
     if (newBlocks <= oldBlocks)
         return 0; //No growth needed.
     int bytesNeeded = newBlocks * blockSize;
+    int oldLocation = fi->location;
     int newLocation = allocate(blockSize, bytesNeeded);
+    if (newLocation < 0) {
+        printf("In ensureAllocation: malloc failed \n");
+        return -2;
+    }
     char *newData = malloc(blockSize);
     for (int i = 0; i < oldBlocks; i++){
-        LBAread(newData,1,fi->location+i);
+        LBAread(newData,1,oldLocation+i);
         LBAwrite(newData,1,newLocation+i);
     }
     free(newData);
     for (int i =0; i < oldBlocks;i++){
-        fsmReleaseLBA(fi->location+i);
+        fsmReleaseLBA(oldLocation+i);
     } 
     fi->location = newLocation;
     return 0;
