@@ -901,7 +901,7 @@ fileInfo * getFileInfo (char * filename, int flags){
     return NULL;
 }
 
-int updateFileSizeOnDisk(char *pathname, int newSize){
+int updateFileSizeOnDisk(char *pathname, int newSize, int newLocation){
     if (!pathname)
         return -1;
     parsePathInfo ppi;
@@ -915,15 +915,36 @@ int updateFileSizeOnDisk(char *pathname, int newSize){
         return -3;
     }
     ppi.parent[ppi.index].numBytes = newSize;
+    ppi.parent[ppi.index].blockNumber = newLocation;
     ppi.parent[ppi.index].modifyDate = time(NULL);
-    LBAwrite(ppi.parent, 1, ppi.parent[0].blockNumber);
+    
+    struct VCB *vcb = getVCB();
+    int blockSize = vcb->blockSize;
+    int numBytes = ppi.parent[ppi.index].numBytes;    
+    int blocksToWrite = (numBytes + blockSize - 1)/ blockSize;
+    LBAwrite(ppi.parent, blocksToWrite, ppi.parent[0].blockNumber);
     return 0;
 }
 
-int ensureAllocation(fileInfo *fi, int newFileSize){
+int ensureAllocation(fileInfo *fi, int oldSize, int newFileSize){
     struct VCB *vcb = getVCB();
-    fsmReleaseLBA(fi->location);
-    int newLocation = allocate(vcb->blockSize, fi->fileSize);
+    if (!vcb) return -1;
+    int blockSize = vcb->blockSize;
+    int oldBlocks = (oldSize + blockSize -1) / blockSize;
+    int newBlocks = (newFileSize + blockSize -1 ) / blockSize;
+    if (newBlocks <= oldBlocks)
+        return 0; //No growth needed.
+    int bytesNeeded = newBlocks * blockSize;
+    int newLocation = allocate(blockSize, bytesNeeded);
+    char *newData = malloc(blockSize);
+    for (int i = 0; i < oldBlocks; i++){
+        LBAread(newData,1,fi->location+i);
+        LBAwrite(newData,1,newLocation+i);
+    }
+    free(newData);
+    for (int i =0; i < oldBlocks;i++){
+        fsmReleaseLBA(fi->location+i);
+    } 
     fi->location = newLocation;
     return 0;
 }

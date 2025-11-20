@@ -162,6 +162,12 @@ int b_write (b_io_fd fd, char * buffer, int count)
 	// Step 4: Write Loop
 	// Write until we reach number (count) passed in.
 	size_t bytesWritten = 0;
+	int oldSize = fcb->fi->fileSize;
+	int startPos = fcb->currentFilePosition;
+	int endPos = startPos + count;
+	int finalSize = (endPos > oldSize) ? endPos : oldSize;
+	if (ensureAllocation(fcb->fi, oldSize, finalSize)<0)
+		return -4; //allocation failed
 	while (bytesWritten < count){
 		// Step 5: Check to see if current file position
 		// is in the current buffer window.
@@ -346,7 +352,8 @@ int b_close (b_io_fd fd)
         LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
     }
 	
-	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, fcbArray[fd].fi->fileSize);
+	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, 
+	fcbArray[fd].fi->fileSize, fcbArray[fd].fi->location);
 
     // free per-file buffer
     if (fcbArray[fd].buf)
