@@ -74,6 +74,7 @@ DE *loadDirectory(const DE *dirEntry){
            //dirEntry->name, dirEntry->isDir, dirEntry->blockNumber-1);
     if (dirEntry->isDir != 1){
         printf("Error: LoadDirectory called on DE that is not a directory.\n");
+        return NULL;
     }
     // Use VCB to get block size.
     struct VCB* v = getVCB();
