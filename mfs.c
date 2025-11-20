@@ -915,3 +915,11 @@ int updateFileSizeOnDisk(char *pathname, int newSize){
     LBAwrite(ppi.parent, 1, ppi.parent[0].blockNumber);
     return 0;
 }
+
+int ensureAllocation(fileInfo *fi, int newFileSize){
+    struct VCB *vcb = getVCB();
+    fsmReleaseLBA(fi->location);
+    int newLocation = allocate(vcb->blockSize, fi->fileSize);
+    fi->location = newLocation;
+    return 0;
+}

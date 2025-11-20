@@ -133,14 +133,6 @@ int loadFSM (int blockSize, unsigned int startBlock){
     return 0;
 }
 
-// keep Ian's work for sure and create releaseBlock and allocate functions
-// Frees the given block number
-void releaseBlock(int blocknum) {
-    if (blocknum < 0) return;
-    clearBit(blocknum);
-    fsmWrite();
-}
-
 int fsmReserveLBA(int lba){ 
     if (lba < 0 )
         return -1;

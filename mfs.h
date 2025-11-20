@@ -122,6 +122,6 @@ struct fs_stat
 
 int fs_stat(char *path, struct fs_stat *buf);
 int Touch(DE * parent, char * name);
-
+int ensureAllocation(fileInfo *fi, int newFileSize);
 #endif
 
