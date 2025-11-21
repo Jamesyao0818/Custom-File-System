@@ -65,7 +65,7 @@ b_io_fd b_getFCB ()
 		}
 	return (-1);  //all in use
 	}
-	
+
 // Interface to open a buffered file
 // Modification of interface for this assignment, flags match the Linux flags for open
 // O_RDONLY, O_WRONLY, or O_RDWR
@@ -89,6 +89,7 @@ b_io_fd b_open (char * filename, int flags)
 		return -1; //malloc failure
 		// malloc failure
 	}
+
 	// TODO 
 	// MAKE SURE ORDER OF FLAG ASSIGNMENT IS FIXED
 
@@ -117,10 +118,10 @@ b_io_fd b_open (char * filename, int flags)
 	return fcbIndex;						// all set*/
 }
 
-// TODO
-// FINISH THIS FUNCTION AND NEST IT IN OTHER FUNCTIONS
+
 // GIVEN PROPER FLAG CONDITIONS
 // Interface to seek function	
+// This function moves the file position pointer to a new location in the file
 int b_seek (b_io_fd fd, off_t offset, int whence)
 	{
 	if (startup == 0) b_init();  //Initialize our system
@@ -130,9 +131,82 @@ int b_seek (b_io_fd fd, off_t offset, int whence)
 		{
 		return (-1); 					//invalid file descriptor
 		}
-		
-		
-	return (0); //Change this
+	
+	// Also need to make sure this file is actually open
+	// If fi is NULL, then this file descriptor isn't being used
+	if (fcbArray[fd].fi == NULL)
+		{
+		return (-1); 					// File isn't open, can't seek
+		}
+	
+	// Get a pointer to the file control block so I can access the file's info
+	b_fcb *fcb = &fcbArray[fd];
+	off_t newPosition;  // This will hold where we want to move to
+	
+	// Now I need to figure out the new position based on whence
+	// whence tells us where to start counting from, and offset tells us how far
+	switch (whence)
+		{
+		case SEEK_SET:
+			// SEEK_SET means start from the beginning of the file
+			// So the new position is just the offset value
+			newPosition = offset;
+			break;
+		case SEEK_CUR:
+			// SEEK_CUR means start from where we currently are
+			// So add the offset to our current position
+			// Offset can be positive (move forward) or negative (move backward)
+			newPosition = fcb->currentFilePosition + offset;
+			break;
+		case SEEK_END:
+			// SEEK_END means start from the end of the file
+			// So add offset to the file size
+			// Offset 0 would put us at the end, negative would go back from end
+			newPosition = fcb->fi->fileSize + offset;
+			break;
+		default:
+			// If whence isn't one of the three valid options, that's an error
+			return (-1);
+		}
+	
+	// Can't seek to a negative position - that would be before the file starts
+	if (newPosition < 0)
+		{
+		return (-1); 					// Invalid position
+		}
+	
+	// Now I need to check if we're moving outside the current buffer window
+	// The buffer only holds one block (512 bytes) at a time
+	// If we're seeking to a different block, we need to handle the buffer
+	int outsideWindow = (newPosition < fcb->bufferStartPosition ||
+	                     newPosition >= fcb->bufferStartPosition + BLOCK_SIZE);
+	
+	// If we're leaving the current buffer window, we need to deal with the buffer
+	if (outsideWindow)
+		{
+		// If there's data in the buffer that hasn't been written to disk yet,
+		// we need to flush it first or we'll lose it
+		if (fcb->numValidBufferBytes > 0)
+			{
+			// Figure out which block on disk this buffer corresponds to
+			// bufferStartPosition tells us where in the file the buffer starts
+			// Divide by BLOCK_SIZE to get which block number that is
+			int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
+			// Add the file's starting location to get the actual disk block
+			blockIndex += fcb->fi->location;
+			// Write the buffer to disk so we don't lose any changes
+			LBAwrite(fcb->buf, 1, blockIndex);
+			}
+		// Mark the buffer as empty/invalid so the next read or write will
+		// know it needs to load the correct block for the new position
+		fcb->numValidBufferBytes = 0;
+		}
+	
+	// Update the current file position to where we're seeking to
+	fcb->currentFilePosition = newPosition;
+	
+	// Return the new position
+	return (newPosition);
 	}
 
 // Interface to write function	
@@ -161,10 +235,6 @@ int b_write (b_io_fd fd, char * buffer, int count)
 	// Step 4: Write Loop
 	// Write until we reach number (count) passed in.
 	size_t bytesWritten = 0;
-	int oldSize = fcb->fi->fileSize;
-	int startPos = fcb->currentFilePosition;
-	int endPos = startPos + count;
-	int finalSize = (endPos > oldSize) ? endPos : oldSize;
 	while (bytesWritten < count){
 		// Step 5: Check to see if current file position
 		// is in the current buffer window.
@@ -348,8 +418,8 @@ int b_close (b_io_fd fd)
         int blockIndex = fcbArray[fd].bufferStartPosition / BLOCK_SIZE;
         LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
     }
-	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, 
-	fcbArray[fd].fi->fileSize, fcbArray[fd].fi->location);
+	
+	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, fcbArray[fd].fi->fileSize);
 
     // free per-file buffer
     if (fcbArray[fd].buf)
