@@ -106,13 +106,14 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 			// Cache the newly created root directory in memory.
 			// createDir returns a pointer to the directory in memory,
 			// so we can use it directly without reading from disk.
-			writeDirToDisk(rootDir, v->blockSize);
+
 			rootDir[0].blockNumber = rootLBA;
 			rootDir[0].loc = rootLBA;
 			fsmReserveLBA(rootLBA);
 			fsmWrite();
 			rootDir[1].blockNumber = rootLBA;
 			rootDir[1].loc = rootLBA;
+			writeDirToDisk(rootDir, v->blockSize);
 			alreadyLoadedCWD = rootDir;
 			alreadyLoadedRootDir = rootDir;
 			writeVCB();
@@ -123,5 +124,7 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 }
 void exitFileSystem ()
 	{
-	printf ("System exiting\n");
+		fsmWrite();
+		writeVCB();
+		printf ("System exiting\n");
 	}

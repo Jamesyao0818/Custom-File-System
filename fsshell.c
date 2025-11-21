@@ -458,6 +458,10 @@ int cmd_cp2l (int argcnt, char *argvec[])
 	
 	
 	testfs_fd = b_open (src, O_RDONLY);
+	if (testfs_fd < 0){
+		printf("filename:%s does not exit in our filesystem.\n", src);
+		return -1;
+	}
 	linux_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC, PERMISSIONS);
 	do 
 		{
@@ -500,9 +504,13 @@ int cmd_cp2fs (int argcnt, char *argvec[])
 			return (-1);
 		}
 	
-	
-	testfs_fd = b_open (dest, O_WRONLY | O_CREAT | O_TRUNC);
 	linux_fd = open (src, O_RDONLY);
+	if (linux_fd < 0){
+		close(linux_fd);
+		printf("Filename:%s does not exist in on Linux Side.\n", src);
+		return -1;
+	}
+	testfs_fd = b_open (dest, O_WRONLY | O_CREAT | O_TRUNC);
 	do 
 		{
 		readcnt = read (linux_fd, buf, BUFFERLEN);

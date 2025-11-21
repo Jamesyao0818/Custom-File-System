@@ -38,6 +38,7 @@
         size_t bytesToMalloc = blocksNeeded * blockSize;
         // How many entries could fit in that space
         size_t actualEntriesCount = bytesToMalloc / (int)sizeof(DE);
+        //printf("In createDir(): Making %ld entries", actualEntriesCount);
         if (blocksNeeded != 1) {
             //Multiple Block Dirs not implemented yet.
             return NULL;
