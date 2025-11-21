@@ -89,7 +89,6 @@ b_io_fd b_open (char * filename, int flags)
 		return -1; //malloc failure
 		// malloc failure
 	}
-
 	// TODO 
 	// MAKE SURE ORDER OF FLAG ASSIGNMENT IS FIXED
 
@@ -166,8 +165,6 @@ int b_write (b_io_fd fd, char * buffer, int count)
 	int startPos = fcb->currentFilePosition;
 	int endPos = startPos + count;
 	int finalSize = (endPos > oldSize) ? endPos : oldSize;
-	if (ensureAllocation(fcb->fi, oldSize, finalSize)<0)
-		return -4; //allocation failed
 	while (bytesWritten < count){
 		// Step 5: Check to see if current file position
 		// is in the current buffer window.
@@ -351,7 +348,6 @@ int b_close (b_io_fd fd)
         int blockIndex = fcbArray[fd].bufferStartPosition / BLOCK_SIZE;
         LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
     }
-	
 	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, 
 	fcbArray[fd].fi->fileSize, fcbArray[fd].fi->location);
 

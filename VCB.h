@@ -38,6 +38,9 @@ struct VCB
 	unsigned int blockIndexFSM;		// Index of the block containing the File System Metadata
 	unsigned int blockIndexRootDirectory;  // Index of the block containing the Root Directory
 	unsigned int MagicNo;			// Magic number identifier (signature)
+	// For Preallocation Strategy
+	unsigned int numFreeBlocks;		// Number of blocks outside of LBA 7
+	unsigned int freeTail;			// Highest lba of last write to FSM.
 	};
 
 // Initialize a new VCB and write it to disk (for formatting new filesystem)

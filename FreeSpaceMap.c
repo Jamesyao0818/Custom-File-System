@@ -70,41 +70,9 @@ static int getBit(int bitToGet) {
     return (fsm[byteNum] & mask);
 }
 
-// Returns the bit position of the next free block, and marks it as used
-// Gets free block
-u_int64_t allocate(int blockSize, int numBytes) {
-    int totalBits = 5 * 8 * blockSize;
-    if (numBytes <= blockSize) {
-        for (int i = 0; i < totalBits; i++) {
-            if (getBit(i) == 0) {
-                setBit(i);
-                fsmWrite();
-                return i;
-            }
-        }
-    }
-    int blocksNeeded = (numBytes + blockSize -1) / blockSize;
-
-    for (int i =0; i <= totalBits - blocksNeeded; i++) {
-        // find a region with enough contiguous unused blocks
-        int allFree = 1;
-        for (int j = 0; j < blocksNeeded; j++) {
-            if (getBit(i+j) != 0 || (i+j) >= totalBits) {
-                allFree = 0;
-                break;
-            }
-        }
-        // now that it is found, allocate each one
-        if (allFree) {
-            for (int j = 0; j < blocksNeeded; j++) {
-                setBit(i + j);
-            }
-            fsmWrite();
-            return i;
-        }
-    }
-
-    return -1; // No free blocks left
+// Used specifically for creation empty dirs/file i.e. single-block
+void allocate(int tailLocation) {
+    setBit(tailLocation);
 }
 
 // Allows the caller to commit fsm changes (that are in memory) to disk

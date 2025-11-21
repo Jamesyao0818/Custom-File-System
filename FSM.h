@@ -18,12 +18,11 @@
 
 //Function Declarations.
 void fsmWrite();
-u_int64_t allocate(int blockSize, int numBytes);
+void allocate(int tailLocation);
 int initFSM(int blockSize);
 static void setBit(int bitToSet);
 static void clearBit(int bitToClear);
 static int getBit(int bitToGet);
-void markBlockUsed(int blocknum);
 int fsmReserveLBA(int lba);
 int fsmReleaseLBA(int lba);
 int fsmIsUsed(int lba);

@@ -51,7 +51,8 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	vcb->MagicNo = VCB_MAGIC;
 	vcb->numBlocks = (unsigned int)numberOfBlocks;
 	vcb->blockSize = (unsigned int)blockSize;
-	
+	vcb->numFreeBlocks = numberOfBlocks - 7;
+	vcb->freeTail = 7;
 	// Due to partition table being at physical block address 0, vcb is at lba 0, but really pba 1.
 	// Subsequently fsm is at lba 1 pba 2.
 	vcb->blockIndexFSM = 1;
@@ -84,9 +85,9 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	// Free temporary buffer
 	free(buffer);
 
-	printf("VCB initialized: MagicNo=0x%X, numBlocks=%u, blockSize=%u, FSM=%u, RootDir=%u\n",
+	printf("VCB initialized: MagicNo=0x%X, numBlocks=%u, blockSize=%u, FSM=%u, RootDir=%u, NumFreeBlocks=%u\n",
 		vcbInMemory->MagicNo, vcbInMemory->numBlocks, vcbInMemory->blockSize,
-		vcbInMemory->blockIndexFSM, vcbInMemory->blockIndexRootDirectory);
+		vcbInMemory->blockIndexFSM, vcbInMemory->blockIndexRootDirectory, vcbInMemory->numFreeBlocks);
 
 	return 0;
 	}
