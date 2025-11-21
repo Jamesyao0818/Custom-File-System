@@ -10,6 +10,6 @@ typedef struct fileInfo {
 } fileInfo;
 
 fileInfo * getFileInfo (char * filename, int flags);
-int updateFileSizeOnDisk(char *pathname, int newSize, int newLocation);
+int updateFileSizeOnDisk(char *pathname, int newSize, int lba);
 int ensureAllocation(int fileSize, int location);
 #endif

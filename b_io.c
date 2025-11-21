@@ -419,7 +419,8 @@ int b_close (b_io_fd fd)
         LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
     }
 	
-	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, fcbArray[fd].fi->fileSize);
+	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, 
+	fcbArray[fd].fi->fileSize, fcbArray[fd].fi->location);
 
     // free per-file buffer
     if (fcbArray[fd].buf)
