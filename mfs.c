@@ -65,10 +65,6 @@ int findChildByHeadBlock(const DE *parent, int entryCount, int childHeadBlock) {
 
 // Joe
 DE *loadDirectory(const DE *dirEntry){
-    if (!dirEntry){
-        printf("Error: LoadDirectory called a NULL DE.\n");
-        return NULL;
-    }
     // Print what we were asked to load (helps you spot the bad caller)
     //printf("loadDirectory(): name='%s' isDir=%d blockNumber(logical)=%d\n",
            //dirEntry->name, dirEntry->isDir, dirEntry->blockNumber-1);
@@ -105,19 +101,7 @@ DE *loadDirectory(const DE *dirEntry){
         free (buffer);
         return NULL;
     }
-    // If read was done correctly, now we can just return the raw bytes of
-    // the dirEntry we want to load. Should work.
-    //printf("In loadDirectory(): Root logical=%d physical=%d\n",
-       //v->blockIndexRootDirectory, v->blockIndexRootDirectory + 1);
     return (DE *)buffer;
-    // IN CASE THIS DOES NOT WORK TRY THIS.
-    /*
-    int numEntries = bytesToRead / sizeof(DE);
-    DE *dirArray = malloc(numEntries * sizeof(DE));
-    memcpy(dirArray, buffer, numEntries * sizeof(DE));
-    free(buffer);
-    return dirArray;
-    */
 }
 
 // Enrique
@@ -457,7 +441,7 @@ int fs_isFile(char * filename){
     return 1;
 }
 // Joe
-// Returns 1 if directory, 0 otherwisepathname
+// Returns 1 if directory, 0 for file. -1 for error resulting from call with bad pathname.
 int fs_isDir(char * pathname){
     if (!pathname || strlen(pathname) == 0) return 0;
 
