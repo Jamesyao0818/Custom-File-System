@@ -83,6 +83,7 @@ void fsmWrite() {
     }
 }
 
+// Function to read our FSM off disk.
 int loadFSM (int blockSize, unsigned int startBlock){
     size_t numBytes = 5 * blockSize;
     if (fsm) { 
@@ -92,7 +93,7 @@ int loadFSM (int blockSize, unsigned int startBlock){
     }
     fsm = (char*)malloc(numBytes);
     if (!fsm) return -1;
-    uint64_t blocksRead = LBAread(fsm, 5, startBlock); //convert to physical
+    uint64_t blocksRead = LBAread(fsm, 5, startBlock);
     if (blocksRead != 5){
         free(fsm);
         fsm = NULL;
@@ -101,6 +102,7 @@ int loadFSM (int blockSize, unsigned int startBlock){
     return 0;
 }
 
+// Access functions so other layers can use FSM.
 int fsmReserveLBA(int lba){ 
     if (lba < 0 )
         return -1;

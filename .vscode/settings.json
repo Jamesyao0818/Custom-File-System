@@ -2,6 +2,7 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "fslow.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "de.h": "c"
     }
 }

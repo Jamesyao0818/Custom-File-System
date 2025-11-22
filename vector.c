@@ -38,10 +38,10 @@ int vectorAdd(stringBuilder* v, const char * substring){
     return 0;
 } 
 
+// Function for adding / delimiter to properly format pathname string to return.
 char * build(const stringBuilder *v, char separator){
     // Null check
     if (!v) return NULL;
-
     // Empty vector
     if (v->size == 0){
         char *emptyVector = (char *)malloc(1);
@@ -49,7 +49,6 @@ char * build(const stringBuilder *v, char separator){
         emptyVector[0]='\0';
         return emptyVector;
     }
-
     // Get total length = sum of subStrings length + separators + '\0'
     size_t length = 1; //Start at one for atleast '\0'
     
@@ -85,13 +84,12 @@ char * build(const stringBuilder *v, char separator){
         // Move the length of last substring forward.
         position += ssLength;
     }
-
     // Put null at end of position string.
     *position = '\0';
-    
     return returnString;
 }
 
+// Function for freeing the vector in memory once it's done with use.
 void freeVector(stringBuilder *v){
     if (!v) return;
     // Free each substring

@@ -41,6 +41,10 @@ typedef struct DE {
 
 } DE;
 
+//Globals for access between functions.
+extern DE *alreadyLoadedRootDir;
+extern DE *alreadyLoadedCWD;
+
 //Function Declarations
 void writeDirToDisk(const DE *dir, int blockSize);
 DE* createDir(int childLBA, int parentLBA, int minEntries, DE * parent, int blockSize);
