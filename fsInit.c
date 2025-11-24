@@ -107,11 +107,9 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 			// so we can use it directly without reading from disk.
 
 			rootDir[0].blockNumber = rootLBA;
-			rootDir[0].loc = rootLBA;
 			fsmReserveLBA(rootLBA);
 			fsmWrite();
 			rootDir[1].blockNumber = rootLBA;
-			rootDir[1].loc = rootLBA;
 			writeDirToDisk(rootDir, v->blockSize);
 			alreadyLoadedCWD = rootDir;
 			alreadyLoadedRootDir = rootDir;

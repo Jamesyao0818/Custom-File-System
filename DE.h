@@ -35,9 +35,6 @@ typedef struct DE {
     time_t createDate;
     time_t modifyDate;
     time_t accessDate;
-    
-    // For discontiguous storage, we need to track the chain of blocks
-    int loc;  // Starting location in block allocation structure
 
 } DE;
 

@@ -56,7 +56,6 @@
             dir[i].isDir = 0;
             dir[i].numBytes = 0;
             dir[i].blockNumber = -1;
-            dir[i].loc = -1;
         }
         //int rootPhys = 6;
         time_t now = time(NULL);

@@ -1,7 +1,7 @@
 /**************************************************************
 * Class::  CSC-415-01 Spring 2024
-* Name:: Enrique Cabral 
-* Student IDs:: 924056104
+* Name:: Enrique Cabral Joseph Bowen
+* Student IDs:: 924056104 922966782
 * GitHub-Name:: rommix408
 * Group-Name:: Don't Worry We Don't Byte
 * Project:: Basic File System

@@ -1,8 +1,8 @@
 /**************************************************************
 * Class::  CSC-415-01 Fall 2025
-* Name:: Ian Kligman
-* Student IDs:: 924122742
-* GitHub-Name:: ikligman
+* Name:: Ian Kligman Joseph Bowen
+* Student IDs:: 924122742 922966782
+* GitHub-Name:: ikligman josephb333
 * Group-Name:: Don't Worry We Don't Byte
 * Project:: Basic File System
 *

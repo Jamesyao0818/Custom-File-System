@@ -1,3 +1,18 @@
+/**************************************************************
+* Class::  CSC-415-01 Fall 2025
+* Name:: Joseph Bowen
+* Student IDs:: 922966782
+* GitHub-Name:: josephb333
+* Group-Name:: Don't Worry We Don't Byte
+* Project:: Basic File System
+*
+* File:: vector.c
+*
+* Description:: This file handles the implementations of necessary
+* functions for vector implementation and its usage in get_cwd
+* such that it can properly be used to build pathname.
+**************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

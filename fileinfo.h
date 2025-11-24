@@ -1,3 +1,17 @@
+/**************************************************************
+* Class::  CSC-415-01 Fall 2025
+* Name:: Ian Kligman, Joseph Bowen
+* Student IDs:: 924122742, 922966782
+* GitHub-Name:: ikligman josephb333
+* Group-Name:: Don't Worry We Don't Byte
+* Project:: Basic File System
+*
+* File:: fileinfo.h
+*
+* Description:: This file contains all necessary functions prototypes
+* and fileInfo Struct for use in IO layer.
+*
+**************************************************************/
 #ifndef _FILEINFO_H
 #define _FILEINFO_H
 

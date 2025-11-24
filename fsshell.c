@@ -1,5 +1,5 @@
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
+* Class::  CSC-415-01 Spring 2024
 * Name::
 * Student IDs::
 * GitHub-Name::
@@ -32,7 +32,7 @@
 
 #define SINGLE_QUOTE	0x27
 #define DOUBLE_QUOTE	0x22
-#define BUFFERLEN		512
+#define BUFFERLEN		200
 #define DIRMAX_LEN		4096
 
 /****   SET THESE TO 1 WHEN READY TO TEST THAT COMMAND ****/

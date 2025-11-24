@@ -10,7 +10,7 @@
 *
 * Description:: 
 *	Function implementations for milestone two.
-*
+*   
 **************************************************************/
 
 #include "mfs.h"
@@ -667,7 +667,6 @@ int fs_mkdir(char *pathname, mode_t mode) {
     ppi.parent[freeIndex].isDir = 1;
     ppi.parent[freeIndex].numBytes = newDir[0].numBytes;
     ppi.parent[freeIndex].blockNumber = newDir[0].blockNumber;
-    ppi.parent[freeIndex].loc = newDir[0].loc;
     ppi.parent[freeIndex].createDate = now;
     ppi.parent[freeIndex].accessDate = now;
     ppi.parent[freeIndex].modifyDate = now;
@@ -804,10 +803,15 @@ int fs_delete(char* filename) {
     int tailLocation = v->freeTail;
     int tailMatch = (blockToStartDelete == (tailLocation-1));
     printf("In fs_delete going to delete filename:%s\n", fileFileToRemove->name);
-    printf("In fs_delete going to delete %d number of blocks. \n", numBlocksToDelete);
+    if (numBlocksToDelete < 1){
+        // Because int div in single-block case numblocksToDelete < 1.
+        // So we set to 1 for safety/ease of readability with debug checks.
+        numBlocksToDelete = 1;
+    }
     int blocksDeleted = 0;
     // Single block delete
     if (numBlocksToDelete <= 1){
+        printf("In fs_delete going to delete number of blocks: %d \n", numBlocksToDelete);
         fsmReleaseLBA(blockToStartDelete);
         printf("In fs_delete(): successfully delete singleblock at: %d\n", blockToStartDelete);
         memset(fileFileToRemove, 0, sizeof(DE));
@@ -964,21 +968,50 @@ int updateFileSizeOnDisk(char *pathname, int newSize, int lba){
         printf("In updateFileSizeOnDisk: DE not found for:%s\n", pathname);
         return -3;
     }
-    // Update size and date;
+    // Get previous size to determine allocation needs
+    int OldSize = ppi.parent[ppi.index].numBytes;
+    // Update Size and Timestamp
     ppi.parent[ppi.index].numBytes = newSize;
     ppi.parent[ppi.index].modifyDate = time(NULL);
     struct VCB *vcb = getVCB();
     // Do arithmetic to see if we went beyond one block initial allocation of DE's
     int blockSize = vcb->blockSize;
     // Get number of blocks to verify in bitmap.
-    int blocksToCheck = (newSize + blockSize - 1) / blockSize;
-    // Get how many blocks are not currently allocated and update them.
-    int blocksToAllocate = ensureAllocation(blocksToCheck, lba);
-    // Update if multiblock file was create then FSM was updated.
-    if (blocksToAllocate > 1)
-        printf("In updateFileSize on disk: %d new blocks allocated for filename: %s\n"
+    int oldBlocks = (OldSize + blockSize - 1) / blockSize;
+    int newBlocks = (newSize + blockSize - 1) / blockSize;
+    // Case we need to reflect growth in FSM.
+    if (newBlocks > oldBlocks){
+        int blocksToCheck = newBlocks;
+        int blocksToAllocate = ensureAllocation(blocksToCheck, lba);
+        if (blocksToAllocate >0){
+            printf("In updateFileSize on disk: %d new blocks allocated for filename: %s\n"
         , blocksToAllocate, ppi.lastElementName);
-    // Persist those changes on disk.
+        }
+    } else if ( newBlocks < oldBlocks){
+        // Case we need to reflect shrinkage in FSM
+        int blocksToFree = oldBlocks - newBlocks;
+        int firstFreeLBA = lba + newBlocks;
+        int lastFreeLBA = lba + oldBlocks - 1;
+        int blocksFreed = 0;
+        // Deallocate loop
+        for (int i = firstFreeLBA; i <= lastFreeLBA; i++){
+            if(fsmIsUsed(i)){
+                fsmReleaseLBA(i);
+                vcb->numFreeBlocks++;
+                blocksFreed++;
+            }
+        }
+        // Update tail if optimization condition is met.
+        int tailLocation = vcb->freeTail;
+        if(lastFreeLBA == tailLocation-1){
+            vcb->freeTail -= blocksToFree;
+            printf("In updateFileSizeOnDisk just deallocated %d blocks, Tail now set to %d",
+            blocksFreed, vcb->freeTail);
+        }
+        // Save updated FSM Changes to disk.
+        fsmWrite();
+    }
+    // Persist metadata changes of DE to disk.
     LBAwrite(ppi.parent, 1, ppi.parent[0].blockNumber);
     return 0;
 }

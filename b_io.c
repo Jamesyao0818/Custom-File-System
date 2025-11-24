@@ -1,15 +1,16 @@
 /**************************************************************
-* Class::  CSC-415-0# Fall 2025
-* Name::
-* Student IDs::
-* GitHub-Name::
-* Group-Name::
+* Class::  CSC-415-01 Fall 2025
+* Name:: Ian Kligman, Joseph Bowen, Enrique Cabral-Mixco
+* Student IDs:: 924122742, 922966782 , 924056104
+* GitHub-Name:: ikligman, josephb333, rommix408
+* Group-Name:: Don't Worry We Don't Byte.
 * Project:: Basic File System
 *
 * File:: b_io.c
 *
 * Description:: Basic File System - Key File I/O Operations
-*
+* Handles in and out of files with correct buffer cycles.
+* Updates above MFS, FSM, VCB layers on close.
 **************************************************************/
 
 #include <stdio.h>
@@ -89,9 +90,12 @@ b_io_fd b_open (char * filename, int flags)
 		return -1; //malloc failure
 		// malloc failure
 	}
-
-	// TODO 
-	// MAKE SURE ORDER OF FLAG ASSIGNMENT IS FIXED
+	
+	if ((flags & O_TRUNC) && (flags & (O_WRONLY | O_RDWR))) {
+    	fi->fileSize = 0;  // logical truncation for this open file
+    	// Optionally update on-disk metadata immediately:
+    	updateFileSizeOnDisk(fi->fileName, 0, fi->location);
+	}
 
 	// if (!fi) return -1; //file not found
 	if (fcbIndex == -1) return -1; //no free file control blocks
@@ -228,6 +232,10 @@ int b_write (b_io_fd fd, char * buffer, int count)
 	b_fcb *fcb = &fcbArray[fd];
 	if (!fcb->fi)
 		return -3; // Bad file info
+	if (fcb->flags == O_RDONLY){
+		printf("In b_write() : file contain's O_RDONLY Flag: aborting now.\n");
+		return -1;
+	}
 	// Step 3: Check for Append flag.
 	// Move the buffer forward to end of file.
 	if (fcb->flags & O_APPEND)
@@ -333,10 +341,6 @@ int b_read (b_io_fd fd, char * buffer, int count)
 	// TO DO 
 	// CHECK FOR PROPER FLAGS
 	// MAKE SURE SEEK IS PUT IF AND WHERE NECESSARY
-
-
-
-	
     if (startup == 0) b_init();  //Initialize our system
 
     // check that fd is between 0 and (MAXFCBS-1)
@@ -353,7 +357,11 @@ int b_read (b_io_fd fd, char * buffer, int count)
 
 
     b_fcb * fcb = &fcbArray[fd]; // Get the current fcb
-
+	if (fcb->flags == O_WRONLY){
+		printf("In b_read : file contain's O_WRONLY Flag: aborting now.\n");
+		return -1;
+	}
+		
     int bytesRead = 0; // Keep track of bytes read per user call to ensure
                        // no more bytes than the user wants (count) are put into user buffer
 	// Main read loop
