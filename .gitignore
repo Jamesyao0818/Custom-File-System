@@ -52,3 +52,6 @@ Mkfile.old
 dkms.conf
 SampleVolume
 fsshell
+big.txt
+bigger.txt
+out.txt
