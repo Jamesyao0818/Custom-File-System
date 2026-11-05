@@ -19,6 +19,7 @@
 #include "vector.h"
 #include "FSM.h"
 #include "fileinfo.h"
+#include "FAT.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -611,15 +612,15 @@ int fs_mkdir(char *pathname, mode_t mode) {
     
     //printf("DEBUG: Calling createDir...\n");
 
-    int childLBA = vcb->freeTail;
-    if (childLBA < vcb->numBlocks){
-        allocate(childLBA);
-        vcb->freeTail++;
-        printf("In mkdir(): Tail is now set to lba number: %d\n", vcb->freeTail);
-        fsmWrite();
-    } else {
+    int childLBA = fsmAllocateBlock(vcb->numBlocks);
+    if (childLBA < 0) {
         printf("Out of space\n");
+        if (ppi.parent != alreadyLoadedRootDir && ppi.parent != alreadyLoadedCWD) {
+            free(ppi.parent);
+        }
+        return -1;
     }
+    fatSetNext(childLBA, FAT_END);
     int parentLBA = ppi.parent[0].blockNumber;
     DE * newDir = createDir(childLBA, parentLBA, 2, ppi.parent, vcb->blockSize);
     if (!newDir) {
@@ -755,12 +756,7 @@ int fs_rmdir(char *pathname) {
     
     // update fsm
     fsmReleaseLBA(ppi.parent[ppi.index].blockNumber);
-    int tailLocation  = vcb->freeTail;
     vcb->numFreeBlocks++;
-    if(ppi.parent[ppi.index].blockNumber == tailLocation-1){
-        vcb->freeTail--;
-        printf("In rm_dir(): Tail is now set to lba number: %d\n", vcb->freeTail);
-    }
     // clear entry in the parent
     memset(&ppi.parent[ppi.index], 0, sizeof(DE)); 
 
@@ -787,113 +783,73 @@ int fs_rmdir(char *pathname) {
 // Ian & Joe
 int fs_delete(char* filename) {
     if (!filename)
-        return -1; //Bad call
+        return -1; // Bad call
     DE * cwd = alreadyLoadedCWD;
-    // Files does not exist
     int index = findInDirectory(cwd, filename);
     if (index < 0)
         return -2; // File not found
     if (cwd[index].isDir != 0)
         return -3; // Called on directory
-    DE * fileFileToRemove = &cwd[index];
     struct VCB *v = getVCB();
-    int blockSize = v->blockSize;
-    int blockToStartDelete = cwd[index].blockNumber;
-    int numBlocksToDelete = (cwd[index].numBytes + blockSize - 1)/ blockSize;
-    int tailLocation = v->freeTail;
-    int tailMatch = (blockToStartDelete == (tailLocation-1));
-    printf("In fs_delete going to delete filename:%s\n", fileFileToRemove->name);
-    if (numBlocksToDelete < 1){
-        // Because int div in single-block case numblocksToDelete < 1.
-        // So we set to 1 for safety/ease of readability with debug checks.
-        numBlocksToDelete = 1;
-    }
-    int blocksDeleted = 0;
-    // Single block delete
-    if (numBlocksToDelete <= 1){
-        printf("In fs_delete going to delete number of blocks: %d \n", numBlocksToDelete);
-        fsmReleaseLBA(blockToStartDelete);
-        printf("In fs_delete(): successfully delete singleblock at: %d\n", blockToStartDelete);
-        memset(fileFileToRemove, 0, sizeof(DE));
-        writeDirToDisk(cwd, v->blockSize);
-        if (tailMatch)
-            v->freeTail--;
-            printf("In fs_delete(): Tail is now set to lba number: %d\n", v->freeTail);
-        return 0;
-    }
-    // Else we can assume we are deleting multi-block file.
-    tailMatch = (blockToStartDelete + numBlocksToDelete == tailLocation -1);
-    for(int i = 0; i<numBlocksToDelete;i++){
-        fsmReleaseLBA(blockToStartDelete+i);
-        blocksDeleted++;
-        //printf("In fs_delete(): successfully deleting block of multi-block file "
-        //"starting at: %d currently deleting block : %d\n", blockToStartDelete,
-        //blockToStartDelete+i);
-    }
-    printf("In fs_delete successfully deleted: %d \n", blocksDeleted);
-    if (tailMatch){
-        v->freeTail -= numBlocksToDelete;
-        printf("In fs_delete(): Tail is now set to lba number: %d\n", v->freeTail);
-    }
-    memset(fileFileToRemove, 0, sizeof(DE));
+    // Walk the file's chain in the FAT and release every block.
+    int freed = fatFreeChain(cwd[index].blockNumber);
+    v->numFreeBlocks += freed;
+    printf("In fs_delete(): freed %d blocks for %s\n", freed, cwd[index].name);
+    memset(&cwd[index], 0, sizeof(DE));
     writeDirToDisk(cwd, v->blockSize);
     return 0;
 }
-    // Joe + Ian
-    // Returns block of new file on success else returns -1 for bad call. -2 insufficient entries, -3 no free entries, -4 LBAwrite failure.
-    int Touch(DE * parent, char * name) {
-        if (!name){
+// Joe + Ian
+// Returns block of new file on success else returns -1 for bad call. -2 insufficient entries, -3 no free entries, -4 LBAwrite failure.
+int Touch(DE * parent, char * name) {
+    if (!name){
         printf("Bad call of touch passed null name\n");
         return -1;
-        }
-        struct VCB * v = getVCB();
-        int tailLocation = v->freeTail;
-        // call allocate to reflect this new file in fsm
-        int freeBlock = v->freeTail;
-        //if (freeBlock  v->numBlocks){
-        //printf("Out of space\n");
-        //}
-        int numEntries = parent[0].numBytes / sizeof(DE);
-        if (numEntries <= 2){
-            printf("Touch: Not enough entries found.\n");
-            return -2; // Error not enough entries.
-        }
-        int freeIndex = -1;
-        //printf("DEBUG: Parent has %d entries\n", numEntries);
-        for (int i = 2; i < numEntries; i++) {
-            if (parent[i].name[0] == '\0') {
+    }
+    struct VCB * v = getVCB();
+    int numEntries = parent[0].numBytes / sizeof(DE);
+    if (numEntries <= 2){
+        printf("Touch: Not enough entries found.\n");
+        return -2;
+    }
+    int freeIndex = -1;
+    for (int i = 2; i < numEntries; i++) {
+        if (parent[i].name[0] == '\0') {
             freeIndex = i;
-            printf("DEBUG: Found free index at %d\n", i);
             break;
-            }
         }
-        if (freeIndex == -1){
-            printf("DEBUG: No free entry slots in directory\n");
-            return -3; // Error no free entries.
-        }
-        time_t now = time(NULL);
-        DE * newEntry = &parent[freeIndex];
-        memset(newEntry, 0, sizeof(DE));
-        strcpy(newEntry->name, name);
-        newEntry->isDir = 0;
-        newEntry->numBytes = 0;
-        newEntry->blockNumber = freeBlock;
-        newEntry->accessDate = now;
-        newEntry->createDate = now;
-        newEntry->modifyDate = now;
-        parent[0].modifyDate = now;
-        struct VCB *vcb = getVCB();
-        vcb->numFreeBlocks--;
-        vcb->freeTail++;
-        printf("In Touch(): Tail is now set to lba number: %d\n", v->freeTail);
-        if(!LBAwrite(parent, 1, parent[0].blockNumber)) {
-            printf("DEBUG: (touch) Failed to LBAwrite to update parent!");
-            return -4; // LBA write failure
-        }
+    }
+    if (freeIndex == -1){
+        printf("DEBUG: No free entry slots in directory\n");
+        return -3;
+    }
+    // Every file owns at least one block: the head of its chain.
+    int freeBlock = fsmAllocateBlock(v->numBlocks);
+    if (freeBlock < 0){
+        printf("Touch: volume is full\n");
+        return -5;
+    }
+    fatSetNext(freeBlock, FAT_END);
+    v->numFreeBlocks--;
 
-        printf("DEBUG: touch success! made empty file %s at block %d\n", name, freeBlock);
-        return freeBlock;
-     }
+    time_t now = time(NULL);
+    DE * newEntry = &parent[freeIndex];
+    memset(newEntry, 0, sizeof(DE));
+    strcpy(newEntry->name, name);
+    newEntry->isDir = 0;
+    newEntry->numBytes = 0;
+    newEntry->blockNumber = freeBlock;
+    newEntry->accessDate = now;
+    newEntry->createDate = now;
+    newEntry->modifyDate = now;
+    parent[0].modifyDate = now;
+    if(!LBAwrite(parent, 1, parent[0].blockNumber)) {
+        printf("DEBUG: (touch) Failed to LBAwrite to update parent!");
+        return -4;
+    }
+    printf("DEBUG: touch success! made empty file %s at block %d\n", name, freeBlock);
+    return freeBlock;
+}
 
 fileInfo * getFileInfo (char * filename, int flags){
     if (!filename)
@@ -958,85 +914,32 @@ int updateFileSizeOnDisk(char *pathname, int newSize, int lba){
     if (!pathname)
         return -1;
     parsePathInfo ppi;
-    // Point to appropriate file
-    int ppResult = parsePath(pathname, &ppi);
-    if (ppResult != 0){
+    if (parsePath(pathname, &ppi) != 0){
         printf("In updateFileSizeOnDisk: parsepath called with invalid path.\n");
         return -2;
-    }    
+    }
     if (ppi.index < 0){
         printf("In updateFileSizeOnDisk: DE not found for:%s\n", pathname);
         return -3;
     }
-    // Get previous size to determine allocation needs
-    int OldSize = ppi.parent[ppi.index].numBytes;
-    // Update Size and Timestamp
     ppi.parent[ppi.index].numBytes = newSize;
     ppi.parent[ppi.index].modifyDate = time(NULL);
+
     struct VCB *vcb = getVCB();
-    // Do arithmetic to see if we went beyond one block initial allocation of DE's
     int blockSize = vcb->blockSize;
-    // Get number of blocks to verify in bitmap.
-    int oldBlocks = (OldSize + blockSize - 1) / blockSize;
     int newBlocks = (newSize + blockSize - 1) / blockSize;
-    // Case we need to reflect growth in FSM.
-    if (newBlocks > oldBlocks){
-        int blocksToCheck = newBlocks;
-        int blocksToAllocate = ensureAllocation(blocksToCheck, lba);
-        if (blocksToAllocate >0){
-            printf("In updateFileSize on disk: %d new blocks allocated for filename: %s\n"
-        , blocksToAllocate, ppi.lastElementName);
+    int keep = (newBlocks > 0) ? newBlocks : 1;   // the head block is never freed
+    int last = fatGetNthBlock(lba, keep - 1);
+    if (last >= 0){
+        int rest = fatGetNext(last);
+        if (rest != FAT_END){
+            fatSetNext(last, FAT_END);
+            int freed = fatFreeChain(rest);
+            vcb->numFreeBlocks += freed;
+            printf("In updateFileSizeOnDisk: trimmed %d blocks from %s\n",
+                   freed, ppi.lastElementName);
         }
-    } else if ( newBlocks < oldBlocks){
-        // Case we need to reflect shrinkage in FSM
-        int blocksToFree = oldBlocks - newBlocks;
-        int firstFreeLBA = lba + newBlocks;
-        int lastFreeLBA = lba + oldBlocks - 1;
-        int blocksFreed = 0;
-        // Deallocate loop
-        for (int i = firstFreeLBA; i <= lastFreeLBA; i++){
-            if(fsmIsUsed(i)){
-                fsmReleaseLBA(i);
-                vcb->numFreeBlocks++;
-                blocksFreed++;
-            }
-        }
-        // Update tail if optimization condition is met.
-        int tailLocation = vcb->freeTail;
-        if(lastFreeLBA == tailLocation-1){
-            vcb->freeTail -= blocksToFree;
-            printf("In updateFileSizeOnDisk just deallocated %d blocks, Tail now set to %d",
-            blocksFreed, vcb->freeTail);
-        }
-        // Save updated FSM Changes to disk.
-        fsmWrite();
     }
-    // Persist metadata changes of DE to disk.
     LBAwrite(ppi.parent, 1, ppi.parent[0].blockNumber);
     return 0;
-}
-
-// Function nested in updateFileSizeOnDisk to make sure multiblock files
-// are correclty reflected in FSM.
-int ensureAllocation(int blocksToCheck, int location){
-    int blocksToAllocate = 0;
-    struct VCB *vcb = getVCB();
-    for (int i = 0; i < blocksToCheck; i++) {
-        int lba = location + i;
-        // If this block is not yet marked as used, claim it now
-        if (!fsmIsUsed(lba)) {
-            //printf("Bit found unmarked... allocating");
-            allocate(lba);
-            vcb->numFreeBlocks--;
-            blocksToAllocate++;
-            vcb->freeTail++;
-        }
-    }
-    printf("Tail is now set to lba number: %d\n", vcb->freeTail);
-    if (blocksToAllocate > 0){
-        fsmWrite();
-        printf("In ensure allocation: allocated %d blocks.\n", blocksToAllocate);
-        printf("In ensure allocation: tail is now at lba %d .\n", vcb->freeTail);       
-    }
-    return blocksToAllocate;
 }

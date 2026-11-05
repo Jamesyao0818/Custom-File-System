@@ -27,7 +27,7 @@ typedef u_int32_t uint32_t;
 #endif
 
 // Magic number to identify valid filesystem
-#define VCB_MAGIC 0x41534442  // "ASDB" in ASCII hex
+#define VCB_MAGIC 0x41534443  // "ASDC" -bumped for FAT layout
 
 // Volume Control Block structure
 // Stored at block 0 on disk
@@ -41,6 +41,8 @@ struct VCB
 	// For Preallocation Strategy
 	unsigned int numFreeBlocks;		// Number of blocks outside of LBA 7
 	unsigned int freeTail;			// Highest lba of last write to FSM.
+	unsigned int blockIndexFAT;
+	unsigned int numFATBlocks;
 	};
 
 // Initialize a new VCB and write it to disk (for formatting new filesystem)

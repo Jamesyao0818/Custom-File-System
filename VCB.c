@@ -19,7 +19,7 @@
 #include <string.h>
 #include "fsLow.h"
 #include "VCB.h"
-
+#include "FAT.h"
 // Global variable to store VCB in memory after reading
 // This avoids repeated disk access
 static struct VCB* vcbInMemory = NULL;
@@ -51,8 +51,11 @@ int initVCB(uint64_t numberOfBlocks, uint64_t blockSize)
 	vcb->MagicNo = VCB_MAGIC;
 	vcb->numBlocks = (unsigned int)numberOfBlocks;
 	vcb->blockSize = (unsigned int)blockSize;
-	vcb->numFreeBlocks = numberOfBlocks - 7;
-	vcb->freeTail = 7;
+	vcb->blockIndexFAT = 7; // FAT will start after VCB (1) and FSM (2-6)
+	vcb->numFATBlocks = fatNumBlocks(numberOfBlocks, blockSize);
+	unsigned int firstDataBlock = vcb->blockIndexFAT + vcb->numFATBlocks;
+	vcb->numFreeBlocks = numberOfBlocks - firstDataBlock;
+	vcb->freeTail = firstDataBlock;
 	// Due to partition table being at physical block address 0, vcb is at lba 0, but really pba 1.
 	// Subsequently fsm is at lba 1 pba 2.
 	vcb->blockIndexFSM = 1;
