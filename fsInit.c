@@ -26,6 +26,7 @@
 #include "VCB.h"
 #include "FSM.h"
 #include "DE.h"
+#include "FAT.h"
 
 //Globals for access between functions.
 DE *alreadyLoadedRootDir = NULL;
@@ -67,7 +68,11 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 		if (loadFSM(blockSize, v->blockIndexFSM) != 0){
 			printf("Error: Failed to load FSM from disk.\n");
 			return -1;
-		} 
+		}
+		if (loadFAT(v->numBlocks, v->blockSize, v->blockIndexFAT) != 0){
+			printf("Error: Failed to load FAT from disk.\n");
+			return -1;
+		}
 		DE rootStub = {0};
 		rootStub.isDir = 1;
 		rootStub.blockNumber = v->blockIndexRootDirectory;
@@ -95,6 +100,10 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 				return -1;
 			}	
 			struct VCB *v = getVCB();
+			if (initFAT(v->numBlocks, v->blockSize, v->blockIndexFAT) != 0){
+				printf("Error: Failed to initialize FAT\n");
+				return -1;
+			}
 			// Create Root Directory (should allocate to block 7)
 			u_int64_t rootLBA = v->blockIndexRootDirectory;
 			DE *rootDir = createDir(rootLBA, rootLBA, 2, NULL, v->blockSize);
@@ -122,6 +131,7 @@ int initFileSystem (uint64_t numberOfBlocks, uint64_t blockSize){
 void exitFileSystem ()
 	{
 		fsmWrite();
+		writeFAT();
 		writeVCB();
 		printf ("System exiting\n");
 	}
