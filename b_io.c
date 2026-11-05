@@ -23,6 +23,9 @@
 #include "b_io.h"
 #include "fileinfo.h"
 #include "fsLow.h"
+#include "VCB.h"
+#include "FSM.h"
+#include "FAT.h"
 
 #define MAXFCBS 20
 #define BLOCK_SIZE 512
@@ -39,6 +42,31 @@ typedef struct b_fcb
 } b_fcb;
 
 b_fcb fcbArray[MAXFCBS];
+// Returns the LBA of the n-th block (0-based) of this file by walking its
+// chain in the FAT. If the chain is too short and allocateIfMissing is set,
+// new blocks are allocated from anywhere on the volume and linked on.
+// Returns -1 on failure.
+static int getFileBlockLBA(fileInfo *fi, int n, int allocateIfMissing) {
+	int cur = fi->location;              // head of the chain
+	for (int i = 0; i < n; i++) {
+		int next = fatGetNext(cur);
+		if (next == FAT_END) {
+			if (!allocateIfMissing) return -1;
+			struct VCB *vcb = getVCB();
+			next = fsmAllocateBlock(vcb->numBlocks);
+			if (next < 0) {
+				printf("In getFileBlockLBA: volume is full\n");
+				return -1;
+			}
+			fatSetNext(next, FAT_END);
+			fatSetNext(cur, next);
+			vcb->numFreeBlocks--;
+			printf("Linked block %d -> %d\n", cur, next);   // debug: shows the chain growing
+		}
+		cur = next;
+	}
+	return cur;
+}
 
 int startup = 0;	//Indicates that this has not been initialized
 
@@ -192,14 +220,9 @@ int b_seek (b_io_fd fd, off_t offset, int whence)
 		// we need to flush it first or we'll lose it
 		if (fcb->numValidBufferBytes > 0)
 			{
-			// Figure out which block on disk this buffer corresponds to
-			// bufferStartPosition tells us where in the file the buffer starts
-			// Divide by BLOCK_SIZE to get which block number that is
-			int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
-			// Add the file's starting location to get the actual disk block
-			blockIndex += fcb->fi->location;
-			// Write the buffer to disk so we don't lose any changes
-			LBAwrite(fcb->buf, 1, blockIndex);
+			int lba = getFileBlockLBA(fcb->fi, fcb->bufferStartPosition / BLOCK_SIZE, 1);
+			if (lba < 0) return -1;
+			LBAwrite(fcb->buf, 1, lba);
 			}
 		// Mark the buffer as empty/invalid so the next read or write will
 		// know it needs to load the correct block for the new position
@@ -254,10 +277,9 @@ int b_write (b_io_fd fd, char * buffer, int count)
 
 		if(outsideWindow && fcb->numValidBufferBytes > 0){
 			// Flush buffer
-			int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
-			int previousLocation = fcb->fi->location;
-			blockIndex +=  previousLocation;
-			LBAwrite(fcb->buf, 1, blockIndex);
+			int lba = getFileBlockLBA(fcb->fi, fcb->bufferStartPosition / BLOCK_SIZE, 1);
+			if (lba < 0) return bytesWritten;
+			LBAwrite(fcb->buf, 1, lba);
 			fcb->numValidBufferBytes = 0;
 		}
 
@@ -267,8 +289,9 @@ int b_write (b_io_fd fd, char * buffer, int count)
 			
 			if (fcb->bufferStartPosition < fcb->fi->fileSize){
 				// There is existing data in this block so we need to read it.
-				int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
-				LBAread(fcb->buf, 1, fcb->fi->location + blockIndex);
+				int lba = getFileBlockLBA(fcb->fi, fcb->bufferStartPosition / BLOCK_SIZE, 0);
+				if (lba < 0) return bytesWritten;
+				LBAread(fcb->buf, 1, lba);
 				int remainingFileBytes = fcb->fi->fileSize - fcb->bufferStartPosition;
 				fcb->numValidBufferBytes = (remainingFileBytes < BLOCK_SIZE) ? remainingFileBytes : BLOCK_SIZE;
 			} else {
@@ -294,11 +317,10 @@ int b_write (b_io_fd fd, char * buffer, int count)
 		// Take the max of current valid bytes or offset + bytestocopy
 		fcb->numValidBufferBytes = fcb->numValidBufferBytes > offset + bytesToCopy ? fcb->numValidBufferBytes : offset + bytesToCopy;
 		// Step 9: Check for full buffer. If full flush
-		int blockIndex = fcb->bufferStartPosition / BLOCK_SIZE;
 		if (fcb->numValidBufferBytes == BLOCK_SIZE || offset + bytesToCopy == BLOCK_SIZE){
-			int previousLocation = fcb->fi->location;
-			blockIndex += previousLocation;
-			LBAwrite(fcb->buf, 1, blockIndex);
+			int lba = getFileBlockLBA(fcb->fi, fcb->bufferStartPosition / BLOCK_SIZE, 1);
+			if (lba < 0) return bytesWritten;
+			LBAwrite(fcb->buf, 1, lba);
 			fcb->numValidBufferBytes=0;
 		}
 		// Step 10: If writing past old file size
@@ -375,7 +397,9 @@ int b_read (b_io_fd fd, char * buffer, int count)
             int blockNumber = fcb->currentFilePosition / BLOCK_SIZE;
 
             // Read 1 block
-            LBAread(fcb->buf, 1, fcb->fi->location + blockNumber);
+            int lba = getFileBlockLBA(fcb->fi, blockNumber, 0);
+            if (lba < 0) break;
+            LBAread(fcb->buf, 1, lba);
 
             // Update buffer position to reflect the read
             fcb->bufferStartPosition = blockNumber * BLOCK_SIZE;
@@ -424,7 +448,8 @@ int b_close (b_io_fd fd)
 	// Flush partial block
 	if (fcbArray[fd].numValidBufferBytes > 0) {
         int blockIndex = fcbArray[fd].bufferStartPosition / BLOCK_SIZE;
-        LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].fi->location + blockIndex);
+        int lba = getFileBlockLBA(fcbArray[fd].fi, blockIndex, 1);
+        if (lba >= 0) LBAwrite(fcbArray[fd].buf, 1, lba);
     }
 	
 	updateFileSizeOnDisk(fcbArray[fd].fi->fileName, 
