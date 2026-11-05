@@ -27,4 +27,5 @@ int fsmReserveLBA(int lba);
 int fsmReleaseLBA(int lba);
 int fsmIsUsed(int lba);
 int loadFSM (int blockSize, unsigned int startBlock);
+int fsmAllocateBlock(int numBlocks);
 #endif

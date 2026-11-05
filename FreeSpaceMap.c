@@ -122,3 +122,14 @@ int fsmIsUsed(int lba){
         return 1;
     return getBit(lba); 
 }
+
+int fsmAllocateBlock(int numBlocks){
+    for(int i =0; i < numBlocks; i++){
+        if(!getBit(i)){
+            setBit(i);
+            fsmWrite();
+            return i;
+        }
+    }
+    return -1; // Return -1 if no free block is found
+}
